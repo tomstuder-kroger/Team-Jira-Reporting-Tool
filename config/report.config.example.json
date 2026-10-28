@@ -14,7 +14,7 @@
   ],
   "pairFieldId": "customfield_12345",
   "pairJqlField": "cf[12345]",
-  "historyDays": 120,
+  "historyDays": 366,
   "defaultRange": "last7",
   "statusBuckets": {
     "Closed": "closed",

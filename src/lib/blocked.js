@@ -83,8 +83,11 @@ export function blockedOverTime(span, cfg = config) {
   }
 }
 
-/** Whole days the ticket has been blocked as of the pull, or null if it is not in an open spell. */
-export function daysBlocked(ticket, pullMs, cfg = config) {
-  const open = spellsFor(ticket, pullMs, cfg).find((s) => s.open)
-  return open ? Math.floor((pullMs - open.start) / DAY_MS) : null
+/**
+ * Whole days the ticket has been blocked as of atMs (default: the pull), or null if it was not
+ * inside a spell then. Lets a past window show how long a blocker had lasted by its end.
+ */
+export function daysBlocked(ticket, pullMs, cfg = config, atMs = pullMs) {
+  const spell = spellsFor(ticket, pullMs, cfg).find((x) => x.start <= atMs && (x.open || x.end > atMs))
+  return spell ? Math.floor((atMs - spell.start) / DAY_MS) : null
 }

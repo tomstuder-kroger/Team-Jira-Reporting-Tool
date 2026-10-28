@@ -47,40 +47,54 @@ Refresh weekly, or whenever you want current numbers.
 
 ## Choose a date range
 
-The **Date range** menu offers:
+The **Date range** menu groups its choices:
 
-- Last 7, 14 or 30 days (7 is the default)
-- This period (for example P10) and this quarter (for example Q3), from the Kroger fiscal calendar
-- A custom start date
+- **Rolling, from the last refresh:** last 7, 14 or 30 days (7 is the default).
+- **Calendar:** this week, and the last full week (Sunday to Saturday).
+- **Fiscal:** this period (for example P10), last period, this quarter, last quarter, and fiscal year to date, from the Kroger fiscal calendar.
+- **Custom dates:** a start and an end date. Leave the end as the latest date to mean "up to the last refresh".
 
-Changing it is instant and doesn't call Jira. Your choice is remembered in the browser.
+**Compare with** shows each summary tile next to an earlier range: the fiscal period or quarter before a "last" choice, otherwise the range of the same length just before. Each tile says how much it changed ("+3 vs 12 before"). Green means better, red means worse, and plain grey means the direction is neither (in progress, in review). The choice is disabled when the earlier range reaches back past the saved data.
 
-- **Every range ends at the last refresh.** Jira keeps only each ticket's most recent update time, so a range that ended earlier would miss tickets touched since. For past weeks, use the Reports page.
-- The page keeps about 4 months of history. A preset or start date that reaches back further than that is disabled or adjusted, and the page says so.
-- Fiscal presets work for FY2026 and FY2027 only, and **FY2027 is assumed, not checked** (see Limits).
+Changing any of this is instant and doesn't call Jira. Your choice is remembered in the browser.
+
+- **Calendar and fiscal choices follow today's date.** "This period" is whichever period today falls in, and it moves on by itself, even on a page left open overnight. Rolling choices count back from the last refresh instead, so they match the saved data.
+- **A range never goes past the last refresh.** If today is newer than the saved data, the page says so. A range that starts after the last refresh is greyed out, "no data yet". Choose Refresh from Jira.
+- **A ticket counts in a range when it was created, resolved, or changed status in it.** Comment-only edits do not count, so the numbers are lower than the earlier "updated" rule gave.
+- **Statuses are shown as they were at the end of the range.** For a past range, a ticket that has since closed shows as it was then. In progress, in review and blocked are counted as of the range's last day.
+- The saved data goes back **366 days** (about a year). A choice that reaches back further is greyed out.
+- Fiscal choices work for FY2026 and FY2027 only, and **FY2027 is assumed, not checked** (see Limits).
 
 ## Change who is tracked
 
-Edit `config/report.config.json`:
+**Use the Roster page** (header link, address ends in `#/roster`). Type part of a name, pick the person Jira finds, then **Save roster**. Remove someone with **Remove** (**Undo** brings them back before you save). Nothing changes until you save, and **Discard changes** throws away your edits.
+
+- Names come from a read-only Jira user search, so they match Jira exactly, including `(NonEmp)`. Only display names are kept, never emails or IDs.
+- Saving rewrites **only** the `roster` part of `config/report.config.json` on this computer and keeps the previous file as `config/report.config.backup.json`. Nothing is changed in Jira. The page reloads so every view uses the new roster.
+- A removed designer disappears right away. **A new designer's tickets appear only after Refresh from Jira.** The page offers the button after you save.
+- It needs `config/report.config.json` to exist (see Keeping it safe to publish). On the example config the page explains this and Save is disabled.
+- Two people can share a name, so check the full name in the results.
+
+You can still edit `config/report.config.json` by hand. Everything else in it:
 
 - **`roster`**: one `{ "jiraName": "Last, First" }` per designer, using the exact Jira display name, including `(NonEmp)` where it appears.
 - **`projects`**, **`issueTypes`**: what the search covers.
 - **`pairFieldId`**, **`pairJqlField`**: the Pair custom field (for example `customfield_12345` and `cf[12345]`; ask your Jira admin for yours).
-- **`historyDays`**: how far back the saved data goes (120).
+- **`historyDays`**: how far back the saved data goes (366, the most allowed, so past fiscal periods can be picked). A longer history makes refresh a little slower and the file bigger.
 - **`defaultRange`**: the range used the first time (`last7`).
 - **`statusBuckets`**: which Jira status shows as which badge. A status that isn't listed shows as Open, and the refresh notice carries a warning. Add it here.
 
-Then choose Refresh from Jira. A new designer's tickets appear only after a refresh. A settings page for this is planned.
+Then choose Refresh from Jira.
 
 ## How the numbers work
 
 - A ticket counts for a designer when they are the assignee or are named in the Pair field. A developer's ticket reaches a designer only through Pair.
-- A **closed** ticket counts in the range when it was resolved in it. An **open** ticket counts when it was updated in it. "Updated" includes any edit, comments included, so a ticket can look active without real progress.
+- A ticket **counts in a range** when it was created, resolved, or changed status in it (see Choose a date range). A **closed** count is tickets resolved in the range.
 - **Active designer:** at least one ticket counted. **No activity:** none, even if they have open tickets. The table says how many.
 - **Tiles:** active designers; no activity; closed; in progress; awaiting PM review; blocked. A ticket shared by two designers counts once in the tiles and appears on both cards.
-- **Blocked** shows every open Blocked ticket on the roster, whatever the range, and marks the ones with no recent update.
+- **Blocked** shows every ticket that was Blocked at the end of the range, with how many days it had been blocked, and marks the ones with no status change in the range.
 - **Statuses** group into five badges: Closed; In Progress; PM Review (also Ready for Review and Ready for Test); Blocked; Open (also In Discovery and Selected).
-- The one-line note on each card is generated from ticket statuses, for example "Updated in the last 7 days: 7 closed, 1 in PM review. Blocked: ABC-123." It describes counts only, not causes or progress.
+- The one-line note on each card is generated from ticket statuses, for example "Activity in the last 7 days: 7 closed, 1 in PM review. Blocked: ABC-123." It describes counts only, not causes or progress.
 
 ## Reports page
 
@@ -108,7 +122,7 @@ Choose **Reports** in the header (the address ends in `#/reports`). Pick how man
 ```
 config/report.config.json      roster, projects, status mapping, history length
 public/data/report.json        generated data the page loads (do not edit)
-server/                        refresh endpoint and Jira client (read-only), with tests
+server/                        refresh and roster endpoints, Jira client (read-only), with tests
 scripts/                       merge step, CLI refresh, credential check
 src/lib/                       counting (report.js), ranges (windows.js), fiscal calendar (fiscal.js), weekly counts (weeks.js), blocked spells (blocked.js), page route (route.js)
 src/components/                header, dashboard, reports page and its charts, range menu, tiles, cards, table
@@ -135,7 +149,7 @@ If a key is ever committed, treat it as exposed: revoke it at https://id.atlassi
 npm test
 ```
 
-97 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
+141 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster page's save and search endpoints, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
 
 ## Packages
 
@@ -150,7 +164,7 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 ## What is not built yet
 
 - Time spent in each status (for example days in PM review).
-- A settings page for the roster, and a drill-down per designer.
+- A drill-down per designer.
 - A scheduled digest (deferred on request).
 
 ## Limits to know
@@ -165,3 +179,7 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 ## After upgrading to the status-history version
 
 The saved file format changed (version 3). The page shows "report.json is in an older format" until you choose **Refresh from Jira** once. The refresh now makes a second read-only call for each ticket's status changes, and the file is about 60 KB larger. Statuses that appear in a ticket's history but are not listed in `statusBuckets` (for example old workflow steps) do not affect the blocked numbers, because only Blocked matters there.
+
+## After the date range update (version 3 data, 366 days)
+
+Refresh from Jira once to bring in the longer history. Until then the saved file only reaches back 120 days, and fiscal choices that start earlier are greyed out. The refresh now returns about 700 tickets instead of about 400 and took about 6 seconds when checked, and the saved file is about 350 KB.

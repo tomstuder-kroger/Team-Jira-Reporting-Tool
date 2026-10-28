@@ -16,7 +16,7 @@ export default function BlockerAlert({ blocked }) {
               <a className="font-mono text-xs text-primary underline-offset-2 hover:underline dark:text-[oklch(0.75_0.12_261.6)]" href={issueUrl(issue.k)} target="_blank" rel="noreferrer">{issue.k}</a>
               <span>{issue.t}</span>
               {days !== null && days !== undefined && <span className="text-xs font-medium text-destructive">blocked {days === 0 ? 'today' : `${days} ${days === 1 ? 'day' : 'days'}`}</span>}
-              {!movedThisWeek && <span className="text-xs text-muted-foreground">No update in the last 7 days</span>}
+              {!movedThisWeek && <span className="text-xs text-muted-foreground">No status change in this range</span>}
             </li>
           ))}
         </ul>

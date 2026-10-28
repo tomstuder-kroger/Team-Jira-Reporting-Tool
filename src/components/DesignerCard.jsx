@@ -44,7 +44,7 @@ export default function DesignerCard({ d }) {
         <div>
           <CardTitle>{shortName(d.name)}</CardTitle>
           <CardDescription>
-            {d.own.length} assigned, {d.pair.length} paired this week{d.own.length === 0 ? ' (paired only)' : ''}
+            {d.own.length} assigned, {d.pair.length} paired in this range{d.own.length === 0 ? ' (paired only)' : ''}
           </CardDescription>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -55,12 +55,12 @@ export default function DesignerCard({ d }) {
       {d.own.length > 0 && (<><Group>Assigned to {first}</Group><TicketRows items={d.own} /></>)}
 
       {d.pair.length > 5 ? (
-        <Disclosure label={`Paired this week (${d.pair.length})`} items={d.pair} showAssignee />
+        <Disclosure label={`Paired in this range (${d.pair.length})`} items={d.pair} showAssignee />
       ) : d.pair.length > 0 ? (
-        <><Group>Paired this week</Group><TicketRows items={d.pair} showAssignee /></>
+        <><Group>Paired in this range</Group><TicketRows items={d.pair} showAssignee /></>
       ) : null}
 
-      {d.idle.length > 0 && <Disclosure label={`Open, no update this week (${d.idle.length})`} items={d.idle} showAssignee />}
+      {d.idle.length > 0 && <Disclosure label={`Open, no activity in this range (${d.idle.length})`} items={d.idle} showAssignee />}
 
       <p className="rounded-md bg-primary/10 px-2.5 py-2 text-sm text-foreground">{d.note}</p>
     </Card>

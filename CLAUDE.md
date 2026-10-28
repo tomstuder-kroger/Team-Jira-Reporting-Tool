@@ -12,7 +12,7 @@ Owner: the product design lead. Audience: design leadership. **Localhost only, b
 
 ```bash
 npm start                                   # dev server and refresh endpoint, http://127.0.0.1:5173
-npm test                                    # vitest, runs once (97 tests)
+npm test                                    # vitest, runs once (141 tests)
 npm run build                               # production build to dist/
 npm run data:jira                           # same refresh as the header button, from the terminal
 node --env-file=.env scripts/jira-check.mjs # checks the credentials, prints status codes only
@@ -29,7 +29,7 @@ Refresh from Jira (header) --POST /api/refresh--> server/ (middleware inside the
 page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.js buildReport() --> components
 ```
 
-- `report.json` (version 3) holds **timestamps and status changes only**: each ticket has `c` created, `u` updated, `r` resolved (null while open), and `h`, its status changes `[timestamp, from, to]` oldest first. About four months of history (`historyDays`, 120). It is about 110 KB for roughly 400 tickets.
+- `report.json` (version 3) holds **timestamps and status changes only**: each ticket has `c` created, `u` updated, `r` resolved (null while open), and `h`, its status changes `[timestamp, from, to]` oldest first. About a year of history (`historyDays`, 366, the maximum). About 350 KB for roughly 700 tickets; a refresh took about 6 seconds when checked.
 - **Which tickets count in the range is decided in the browser.** Changing the range never calls Jira. The page rejects any file whose `version` is not 3 and tells the user to refresh.
 - The server code is plain modules in `server/` so it is unit tested with a mocked Jira. `vite.config.js` mounts it with `configureServer`; `.env` is read once when the dev server starts, so **restart `npm start` after editing `.env`**.
 - Credentials never reach the browser. The endpoint's responses and errors never contain them (tested).
@@ -41,19 +41,24 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 | `config/report.config.json` | Roster, projects, issue types, Pair field IDs, `historyDays`, `defaultRange`, status-to-bucket map. |
 | `public/data/report.json` | Generated. Do not hand-edit. |
 | `server/api.mjs` | `POST /api/refresh` middleware: localhost Host and same-origin checks, 15 s cooldown, shares one Jira call between overlapping clicks. |
+| `server/guard.mjs`, `config.mjs` | Shared localhost/same-origin check, JSON body reader, and config reader used by every endpoint. |
+| `server/roster.mjs` | Roster page endpoints: GET/PUT `/api/roster`, GET `/api/users/search`. Writes only the `roster` key of the local config, with a backup and an atomic write. |
 | `server/jira.mjs` | Read-only Jira client: POST `/rest/api/3/search/jql` and POST `/rest/api/3/changelog/bulkfetch` (both only read), follows `nextPageToken`, 30 s timeout, plain-language errors. `created` in the bulk response is epoch milliseconds, not an ISO string. |
 | `server/queries.mjs` | Builds the one JQL search and validates config. |
 | `server/refresh.mjs`, `run.mjs`, `store.mjs` | Maps issues to rows, calls the merge, writes the file atomically (temp file, then rename). |
 | `scripts/merge-lib.mjs` | Pure merge: dedupe, drop non-roster tickets, normalise timestamps, stamp `pulledAt`. |
 | `scripts/refresh-jira.mjs`, `jira-check.mjs` | CLI refresh and credential check. |
 | `src/lib/report.js` | `buildReport(data, window)`: buckets, counts, active/quiet split, blockers, tiles, notes. |
-| `src/lib/windows.js` | Presets, custom start date, clamping, saved choice. |
+| `src/lib/windows.js` | Windows: presets (rolling, calendar, fiscal), custom start and end, compare window, clamping to history and the pull, saved choice. |
+| `src/lib/history.js` | Status replay and the activity rule. Pure functions. |
+| `src/lib/today.js` | `useToday()`: today's date, refreshed each minute and when the tab becomes visible. |
 | `src/lib/fiscal.js` | Kroger fiscal calendar. |
 | `src/lib/weeks.js` | Reports page maths: Sunday-start weeks, opened and closed per week, velocity, open by status, closed by designer. Pure functions. |
 | `src/lib/blocked.js` | Blocked spells from each ticket's status history, per-week blocked counts, days blocked. Pure functions. |
-| `src/lib/route.js` | Hash route (`#/reports`, else dashboard). No router library. |
+| `src/lib/route.js` | Hash route (`#/reports`, `#/roster`, else dashboard). No router library. |
+| `src/lib/rosterApi.js` | Browser calls to the roster endpoints; carries the saved-roster message across the reload. |
 | `src/App.jsx` | Loads the data, refresh state, shared alerts, switches page. |
-| `src/components/Dashboard.jsx`, `ReportsPage.jsx` | The two pages. Charts are plain SVG (`WeeklyChart`, `StatusDonut`, `ClosedByDesigner`) using theme tokens. |
+| `src/components/Dashboard.jsx`, `ReportsPage.jsx`, `RosterPage.jsx` | The three pages. Charts are plain SVG (`WeeklyChart`, `StatusDonut`, `ClosedByDesigner`) using theme tokens. |
 | `src/components/` | Header, RangeControls, KpiStrip, BlockerAlert, DesignerCard, QuietTable, StatusBadge, KdsNotice. |
 | `src/components/ui/` | shadcn-style primitives. `alert`, `badge`, `button`, `label` are copied from the sibling reference app. `card` is new. |
 | `src/index.css` | Theme tokens (oklch), copied from the sibling reference app. Light and `.dark`. |
@@ -62,12 +67,13 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 - **Roster:** the names in `config.roster`, by Jira display name.
 - **Counts for a designer:** assigned to them, or named in the Pair field. A developer's ticket reaches a designer only through Pair.
-- **Range:** starts at a rolling offset (last 7, 14, 30 days from the pull) or a local midnight (this fiscal period, this fiscal quarter, a custom start date). **It always ends at the last pull.** Jira keeps only a ticket's latest update time, so a range ending earlier would silently miss tickets touched since. Do not add end-date controls without status history.
-- **Moved in the range:** a closed ticket when its resolved date is in the range; an open ticket when its updated date is in the range. "Updated" includes any edit, comments included. A closed ticket edited after it closed is not moved.
-- **Active designer:** at least one moved ticket. **No activity:** none, even if they have open tickets; the table says how many.
-- **Tiles:** active; no activity; closed (moved and in a Closed status); in progress and PM review (moved tickets currently in that bucket); blocked. **Blocked is every open Blocked ticket on the roster, regardless of range.** A ticket shared by two designers counts once in the tiles and appears on both cards.
+- **Window:** `{ start, end }`, start inclusive, end exclusive, and **end never passes the last pull**. Rolling presets (last 7, 14, 30 days) count back from the pull. Calendar and fiscal presets (this/last week, this/last period, this/last quarter, fiscal year to date) are worked out from **today**, via `useToday()`, so they roll over by themselves; their end is held back to the pull, and a window that starts after the pull is disabled with "Refresh from Jira" and the page shows a stale-data note. Custom ranges take a start and an end day. `resolveWindow(range, pull, historyStart, today)` in `src/lib/windows.js`.
+- **Compare:** `range.compare === 'previous'` adds `prev`, `change` and `good` to each KPI tile. Previous = the fiscal period or quarter before a "last" preset (`prev` field), else the same length ending where this window starts. Unavailable (with a reason) if it reaches before `historyStart`.
+- **Counts in a window:** a ticket that was **created, resolved, or changed status** in it (`hasActivity` in `src/lib/history.js`). Comment-only edits (`u`) are deliberately not activity. **Statuses are shown as at the end of the window**, replayed from `h` with `statusAt`/`statusAtEnd`; a window ending at the pull uses the current status. A ticket is open at the end if it existed and was not yet resolved. Tickets follow their **current** assignee and Pair, so a reassignment moves past activity to the new owner (stated in the page footer).
+- **Active designer:** at least one counted ticket. **No activity:** none, even if they have open tickets; the table says how many.
+- **Tiles:** active; no activity; closed (moved and in a Closed status); in progress and PM review (moved tickets currently in that bucket); blocked. **Blocked is every ticket Blocked at the end of the window** (for a window ending now, today's blocked list), with days blocked as of that moment. A ticket shared by two designers counts once in the tiles and appears on both cards.
 - **Buckets:** Closed; In Progress; PM Review (also Ready for Review, Ready for Test); Blocked; Open (also In Discovery, Selected). An unmapped status falls back to `defaultBucket` (open) and the refresh returns a warning.
-- **Card notes** are generated from statuses only ("Updated in the last 7 days: 7 closed, 1 in PM review. Blocked: ABC-123."). No model-written text remains. Keep it that way: never invent causes, effort, or intent.
+- **Card notes** are generated from statuses only ("Activity in the last 7 days: 7 closed, 1 in PM review. Blocked: ABC-123."). No model-written text remains. Keep it that way: never invent causes, effort, or intent.
 - **Fiscal calendar:** 13 four-week periods, Sunday to Saturday. Quarters are P1-4 (16 weeks), P5-7, P8-10, P11-13 (12 weeks each). FY2026 starts 2026-02-01 and was checked against Kroger's printed calendar, all 13 periods. FY2027 is assumed to start 2027-01-31 on the same pattern and is **not verified**. After FY2027 `fiscalPosition()` returns null and the fiscal presets hide.
 
 ## Rules
@@ -76,13 +82,13 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 - Counting lives in code with tests. If a number looks wrong, fix `report.js` and add a test; do not patch the data.
 - Never ask the user to paste a token or password into chat. Never print `.env` values. Checks print status codes and counts only.
 - Do not modify the sibling reference app that supplied the look and `node_modules` (a local clone on this machine). It is read-only.
-- The app must stay read-only toward Jira. The only calls are the search and the bulk status-history fetch, both POSTs that read. Do not add anything that writes.
+- The app must stay read-only toward Jira. The only Jira calls are the search, the bulk status-history fetch (both POSTs that read) and the user search (a GET). Do not add anything that writes to Jira. The one thing the app writes is a local file: the `roster` key of `config/report.config.json` (with a backup), only from the Roster page, localhost and same-origin only. Never log or return emails or account IDs from the user search.
 - Do not copy credentials between `.npmrc` files or anywhere else without asking.
 - Before refreshing for real, `public/data/report.json` can be copied to `data-raw/` as a backup. `data-raw/` is git-ignored.
 
 ## Tests
 
-97 tests in five files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
+141 tests in seven files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `server/roster.test.js` (roster validation and save, backup, endpoint guards, user search leaks no email or ID), `src/lib/history.test.js` (status replay, activity rule, open at end), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
 
 ## Stale pieces
 
@@ -92,11 +98,13 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 ## Status
 
-- **Done:** theme, header and refresh button; live refresh from Jira; date ranges with fiscal presets; factual notes.
-- **Not seen by the owner yet:** the range dropdown and custom date picker. Layout at phone width and in dark mode has not been checked in a browser.
+- **Done:** theme, header and refresh button; live refresh from Jira; factual notes; Waves 4 and 5 (Reports, status history, Roster page).
+- **Wave 6 built (date range rework; not yet seen by the owner in a browser):** presets for week, period, quarter and fiscal year (this and last), custom start and end, compare with an earlier range, today-based fiscal lookups, status-change activity rule, statuses as at the end of the range, 366 days of history.
+- **Not seen by the owner yet:** the range dropdown, custom dates and compare. Layout at phone width and in dark mode has not been checked in a browser.
 - **Wave 4 built (not yet seen by the owner in a browser):** Reports page with weekly opened/closed chart and table, open-by-status donut, closed by designer, and velocity from ticket counts.
 - **Wave 5a built (status history; not yet seen by the owner in a browser):** blocked over time on Reports, days blocked on the Dashboard.
-- **Next:** the roster settings page (planned, not built). Story-point velocity only once the owner names the field. **Later:** per-designer drill-down. **Deferred on request:** scheduled digest.
+- **Wave 5b built (roster page; not yet seen by the owner in a browser):** add by Jira search, remove, save to the config file.
+- **Next:** Story-point velocity only once the owner names the field. **Later:** per-designer drill-down. **Deferred on request:** scheduled digest.
 
 ## Blocked definitions
 

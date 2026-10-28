@@ -28,7 +28,8 @@ const dayNumberToLocal = (n) => {
 
 /**
  * Where a date falls in the fiscal calendar, or null outside the known years.
- * Dates are local midnights; periodEnd and quarterEnd are the last day, inclusive.
+ * Dates are local midnights; periodEnd, quarterEnd and yearEnd are the last day, inclusive.
+ * Look up the previous period or quarter by asking for the day before periodStart or quarterStart.
  */
 export function fiscalPosition(date) {
   const today = dayNumber(date.getFullYear(), date.getMonth(), date.getDate())
@@ -42,6 +43,8 @@ export function fiscalPosition(date) {
       year: Number(year),
       period: idx + 1,
       quarter: q + 1,
+      yearStart: dayNumberToLocal(start),
+      yearEnd: dayNumberToLocal(start + PERIODS_PER_YEAR * PERIOD_DAYS - 1),
       periodStart: dayNumberToLocal(start + idx * PERIOD_DAYS),
       periodEnd: dayNumberToLocal(start + (idx + 1) * PERIOD_DAYS - 1),
       quarterStart: dayNumberToLocal(start + QUARTER_FIRST_PERIOD[q] * PERIOD_DAYS),
