@@ -12,7 +12,7 @@ Owner: the product design lead. Audience: design leadership. **Localhost only, b
 
 ```bash
 npm start                                   # dev server and refresh endpoint, http://127.0.0.1:5173
-npm test                                    # vitest, runs once (141 tests)
+npm test                                    # vitest, runs once (152 tests)
 npm run build                               # production build to dist/
 npm run data:jira                           # same refresh as the header button, from the terminal
 node --env-file=.env scripts/jira-check.mjs # checks the credentials, prints status codes only
@@ -50,6 +50,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 | `scripts/refresh-jira.mjs`, `jira-check.mjs` | CLI refresh and credential check. |
 | `src/lib/report.js` | `buildReport(data, window)`: buckets, counts, active/quiet split, blockers, tiles, notes. |
 | `src/lib/windows.js` | Windows: presets (rolling, calendar, fiscal), custom start and end, compare window, clamping to history and the pull, saved choice. |
+| `src/lib/designers.js` | Dashboard card sort (last name, A-Z, Z-A, or needs-attention order), name filter, saved layout (`dar.view`). Pure functions. |
 | `src/lib/history.js` | Status replay and the activity rule. Pure functions. |
 | `src/lib/today.js` | `useToday()`: today's date, refreshed each minute and when the tab becomes visible. |
 | `src/lib/fiscal.js` | Kroger fiscal calendar. |
@@ -88,7 +89,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 ## Tests
 
-141 tests in seven files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `server/roster.test.js` (roster validation and save, backup, endpoint guards, user search leaks no email or ID), `src/lib/history.test.js` (status replay, activity rule, open at end), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
+152 tests in nine files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `server/roster.test.js` (roster validation and save, backup, endpoint guards, user search leaks no email or ID), `src/lib/designers.test.js` (last-name sort, name filter, saved layout), `src/components/DesignerCard.test.jsx` (hidden card keeps name, counts and badges), `src/lib/history.test.js` (status replay, activity rule, open at end), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
 
 ## Stale pieces
 
@@ -100,7 +101,8 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 - **Done:** theme, header and refresh button; live refresh from Jira; factual notes; Waves 4 and 5 (Reports, status history, Roster page).
 - **Wave 6 built (date range rework; not yet seen by the owner in a browser):** presets for week, period, quarter and fiscal year (this and last), custom start and end, compare with an earlier range, today-based fiscal lookups, status-change activity rule, statuses as at the end of the range, 366 days of history.
-- **Not seen by the owner yet:** the range dropdown, custom dates and compare. Layout at phone width and in dark mode has not been checked in a browser.
+- **Dashboard cards (not yet seen by the owner in a browser):** grid or list layout, per-card show/hide that keeps name, counts and badges, sort by last name, filter by name. Filter and sort affect only the cards and the no-activity table, never the tiles or blockers. Hidden cards are not remembered across visits; layout and sort are.
+- **Not seen by the owner yet:** the range dropdown, custom dates, compare and the card controls. Layout at phone width and in dark mode has not been checked in a browser.
 - **Wave 4 built (not yet seen by the owner in a browser):** Reports page with weekly opened/closed chart and table, open-by-status donut, closed by designer, and velocity from ticket counts.
 - **Wave 5a built (status history; not yet seen by the owner in a browser):** blocked over time on Reports, days blocked on the Dashboard.
 - **Wave 5b built (roster page; not yet seen by the owner in a browser):** add by Jira search, remove, save to the config file.

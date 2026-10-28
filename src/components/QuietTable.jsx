@@ -1,7 +1,7 @@
 import { BucketBadge } from '@/components/StatusBadge'
 import { shortName } from '@/lib/report'
 
-export default function QuietTable({ quiet }) {
+export default function QuietTable({ quiet, filtered = false }) {
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
       <table className="w-full min-w-[520px] border-collapse text-sm">
@@ -14,7 +14,7 @@ export default function QuietTable({ quiet }) {
         </thead>
         <tbody>
           {quiet.length === 0 && (
-            <tr><td colSpan={3} className="px-3.5 py-3 text-muted-foreground">Every designer had activity this week.</td></tr>
+            <tr><td colSpan={3} className="px-3.5 py-3 text-muted-foreground">{filtered ? 'No designer without activity matches that name.' : 'Every designer had activity in this range.'}</td></tr>
           )}
           {quiet.map((d) => (
             <tr key={d.name} className="border-t align-top">

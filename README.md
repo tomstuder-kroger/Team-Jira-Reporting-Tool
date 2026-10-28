@@ -65,6 +65,15 @@ Changing any of this is instant and doesn't call Jira. Your choice is remembered
 - The saved data goes back **366 days** (about a year). A choice that reaches back further is greyed out.
 - Fiscal choices work for FY2026 and FY2027 only, and **FY2027 is assumed, not checked** (see Limits).
 
+## Designer cards: layout, sort, filter, show and hide
+
+Above the cards on the Dashboard:
+
+- **Filter by name** matches last or first name, in either order, ignoring case ("doe", "jamie", "doe, ja"). It filters the active cards and the no-activity table. The summary tiles and the blocker list always cover everyone.
+- **Sort by:** needs attention first (blockers, then most activity, the original order), or last name A to Z or Z to A.
+- **Layout:** **Grid** (cards side by side, as before) or **List** (one full-width card per person). Your layout and sort are remembered in the browser.
+- **Hide or show:** each card's name has an arrow. Hiding a card keeps the name, the assigned and paired counts, and the status badges (closed, in progress, PM review, blocked) and hides the ticket lists and the note. **Show all** and **Hide all** do every card at once. Which cards are hidden is not remembered, so every visit starts with all shown.
+
 ## Change who is tracked
 
 **Use the Roster page** (header link, address ends in `#/roster`). Type part of a name, pick the person Jira finds, then **Save roster**. Remove someone with **Remove** (**Undo** brings them back before you save). Nothing changes until you save, and **Discard changes** throws away your edits.
@@ -125,7 +134,7 @@ public/data/report.json        generated data the page loads (do not edit)
 server/                        refresh and roster endpoints, Jira client (read-only), with tests
 scripts/                       merge step, CLI refresh, credential check
 src/lib/                       counting (report.js), ranges (windows.js), fiscal calendar (fiscal.js), weekly counts (weeks.js), blocked spells (blocked.js), page route (route.js)
-src/components/                header, dashboard, reports page and its charts, range menu, tiles, cards, table
+src/components/                header, dashboard and its card toolbar, reports page and its charts, range menu, tiles, cards, table
 .env                           your Jira key (git-ignored, you create it)
 CLAUDE.md                      background, rules, and Wave 4 notes for Claude Code
 ```
@@ -149,7 +158,7 @@ If a key is ever committed, treat it as exposed: revoke it at https://id.atlassi
 npm test
 ```
 
-141 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster page's save and search endpoints, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
+152 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster page's save and search endpoints, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
 
 ## Packages
 

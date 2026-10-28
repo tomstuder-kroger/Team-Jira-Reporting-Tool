@@ -1,6 +1,7 @@
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import StatusBadge, { BucketBadge } from '@/components/StatusBadge'
 import { LABEL, bucketOf, byRank, issueUrl, shortName } from '@/lib/report'
+import { cn } from '@/lib/utils'
 
 function TicketRows({ items, showAssignee }) {
   return (
@@ -32,26 +33,40 @@ const Group = ({ children }) => (
   <div className="-mb-1 mt-0.5 text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">{children}</div>
 )
 
-export default function DesignerCard({ d }) {
+export default function DesignerCard({ d, open = true, onToggle }) {
   const first = shortName(d.name).split(' ')[0]
+  const bodyId = `card-${d.name.replace(/[^A-Za-z0-9]+/g, '-')}`
   const counts = ['closed', 'prog', 'review', 'blocked']
     .map((b) => [b, d.week.filter((i) => bucketOf(i) === b).length])
     .filter(([, n]) => n > 0)
 
   return (
     <Card>
-      <CardHeader>
-        <div>
-          <CardTitle>{shortName(d.name)}</CardTitle>
-          <CardDescription>
-            {d.own.length} assigned, {d.pair.length} paired in this range{d.own.length === 0 ? ' (paired only)' : ''}
-          </CardDescription>
-        </div>
+      <CardHeader className="items-center">
+        <button
+          type="button"
+          className="-m-1 flex min-w-0 items-center gap-2 rounded-md p-1 text-left outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          aria-label={`${open ? 'Hide' : 'Show'} tickets for ${shortName(d.name)}`}
+          onClick={onToggle}
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true" className={cn('size-3 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')}>
+            <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="min-w-0">
+            <CardTitle>{shortName(d.name)}</CardTitle>
+            <CardDescription>
+              {d.own.length} assigned, {d.pair.length} paired in this range{d.own.length === 0 ? ' (paired only)' : ''}
+            </CardDescription>
+          </span>
+        </button>
         <div className="flex flex-wrap gap-1">
           {counts.map(([b, n]) => <BucketBadge key={b} bucket={b}>{n} {LABEL[b]}</BucketBadge>)}
         </div>
       </CardHeader>
 
+      <div id={bodyId} hidden={!open} className="flex flex-col gap-3">
       {d.own.length > 0 && (<><Group>Assigned to {first}</Group><TicketRows items={d.own} /></>)}
 
       {d.pair.length > 5 ? (
@@ -63,6 +78,7 @@ export default function DesignerCard({ d }) {
       {d.idle.length > 0 && <Disclosure label={`Open, no activity in this range (${d.idle.length})`} items={d.idle} showAssignee />}
 
       <p className="rounded-md bg-primary/10 px-2.5 py-2 text-sm text-foreground">{d.note}</p>
+      </div>
     </Card>
   )
 }
