@@ -10,18 +10,19 @@ import BlockedChart from '@/components/BlockedChart'
 import BlockedTiles from '@/components/BlockedTiles'
 import { pulledLabel } from '@/lib/report'
 import { blockedOverTime } from '@/lib/blocked'
-import { buildWeeks, closedByDesigner, loadSpan, openByStatus, saveSpan, velocity } from '@/lib/weeks'
+import { PRESET_SPANS, buildWeeks, closedByDesigner, effectiveSpan, loadSpanChoice, openByStatus, presetLabel, saveSpanChoice, spanText, velocity } from '@/lib/weeks'
 import { cn } from '@/lib/utils'
 
 const FIELD =
   'h-8 rounded-md border border-input bg-input/20 px-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30'
 
-const SpanLabel = { 4: 'Last 4 weeks', 8: 'Last 8 weeks', 12: 'Last 12 weeks', all: 'All saved weeks' }
-
 export default function ReportsPage({ data }) {
-  const [span, setSpan] = useState(loadSpan)
-  const change = useCallback((v) => { setSpan(v); saveSpan(v) }, [])
+  const [pick, setPick] = useState(loadSpanChoice) // { choice: '1' | '2' | ... | 'all' | 'custom', custom: number }
+  const change = useCallback((next) => { setPick(next); saveSpanChoice(next) }, [])
 
+  // How many complete weeks the saved data holds, which caps a custom number.
+  const available = useMemo(() => buildWeeks(data, 'all').available, [data])
+  const span = effectiveSpan(pick, available)
   const res = useMemo(() => buildWeeks(data, span), [data, span])
   const vel = useMemo(() => velocity(res), [res])
   const blk = useMemo(() => blockedOverTime(res), [res])
@@ -41,12 +42,32 @@ export default function ReportsPage({ data }) {
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="span-select">Weeks shown</Label>
-            <select id="span-select" className={cn(FIELD, 'min-w-44')} value={span} onChange={(e) => change(e.target.value)}>
-              {Object.entries(SpanLabel).map(([id, label]) => (
-                <option key={id} value={id}>{label}{id === 'all' ? ` (${res.available})` : ''}</option>
+            <select id="span-select" className={cn(FIELD, 'min-w-44')} value={pick.choice} onChange={(e) => change({ ...pick, choice: e.target.value })}>
+              {PRESET_SPANS.map((id) => (
+                <option key={id} value={id} disabled={id !== 'all' && Number(id) > available}>{presetLabel(id, available)}</option>
               ))}
+              <option value="custom">Custom number of weeks…</option>
             </select>
           </div>
+          {pick.choice === 'custom' && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="span-custom">Weeks (1 to {available})</Label>
+              <input
+                id="span-custom"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={available}
+                step={1}
+                className={cn(FIELD, 'w-24')}
+                value={Math.min(pick.custom, Math.max(1, available))}
+                onChange={(e) => {
+                  const n = Math.floor(Number(e.target.value))
+                  if (Number.isFinite(n) && n >= 1) change({ ...pick, custom: n })
+                }}
+              />
+            </div>
+          )}
           <dl className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-xs tabular-nums">
             <dt className="text-muted-foreground">Data pulled</dt><dd>{pulledLabel(data.meta)}</dd>
           </dl>
@@ -63,14 +84,6 @@ export default function ReportsPage({ data }) {
             <CardDescription>by created and resolved date</CardDescription>
           </CardHeader>
           <WeeklyChart weeks={res.weeks} />
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Week by week</CardTitle>
-            <CardDescription>net = opened minus closed</CardDescription>
-          </CardHeader>
-          <WeeklyTable weeks={blk.weeks} />
         </Card>
 
         <Card>
@@ -92,9 +105,17 @@ export default function ReportsPage({ data }) {
         <Card>
           <CardHeader>
             <CardTitle>Closed by designer</CardTitle>
-            <CardDescription>{SpanLabel[span].toLowerCase()}, to the last pull</CardDescription>
+            <CardDescription>{spanText(span, available)}, to the last pull</CardDescription>
           </CardHeader>
           <ClosedByDesigner data={byDesigner} />
+        </Card>
+
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle>Week by week</CardTitle>
+            <CardDescription>net = opened minus closed</CardDescription>
+          </CardHeader>
+          <WeeklyTable weeks={blk.weeks} />
         </Card>
       </div>
 

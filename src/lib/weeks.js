@@ -14,26 +14,45 @@ const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 
 
 export const weekStart = (d) => addDays(d, -d.getDay())
 
-export const SPANS = ['4', '8', '12', 'all']
+// The "Weeks shown" choice: a preset number of complete weeks, 'all', or 'custom' with its own number.
+export const PRESET_SPANS = ['1', '2', '4', '8', '12', 'all']
 const KEY = 'dar.weeks'
+export const defaultSpanChoice = () => ({ choice: '8', custom: 6 })
 export const defaultSpan = () => '8'
 
-export function loadSpan() {
+const wholeWeeks = (n) => (Number.isInteger(n) && n >= 1 ? n : null)
+
+export function loadSpanChoice() {
   try {
-    const v = localStorage.getItem(KEY)
-    if (SPANS.includes(v)) return v
-  } catch { /* storage unavailable */ }
-  return defaultSpan()
+    const raw = localStorage.getItem(KEY)
+    if (PRESET_SPANS.includes(raw)) return { ...defaultSpanChoice(), choice: raw } // saved by an earlier version
+    const v = JSON.parse(raw)
+    const custom = wholeWeeks(v?.custom) ?? defaultSpanChoice().custom
+    if (v?.choice === 'custom' || PRESET_SPANS.includes(v?.choice)) return { choice: v.choice, custom }
+  } catch { /* storage unavailable or corrupt */ }
+  return defaultSpanChoice()
 }
 
-export function saveSpan(span) {
-  try { localStorage.setItem(KEY, span) } catch { /* ignore */ }
+export function saveSpanChoice(value) {
+  try { localStorage.setItem(KEY, JSON.stringify(value)) } catch { /* ignore */ }
 }
+
+/** The span string buildWeeks takes: '1', '2', ..., or 'all'. A custom number is kept between 1 and the weeks saved. */
+export function effectiveSpan({ choice, custom }, available) {
+  if (choice !== 'custom') return choice
+  const max = Math.max(1, available)
+  return String(Math.min(max, Math.max(1, wholeWeeks(custom) ?? 1)))
+}
+
+const weeksWord = (n) => `${n} ${n === 1 ? 'week' : 'weeks'}`
+export const spanText = (span, available) => (span === 'all' ? 'all saved weeks' : `the last ${weeksWord(Number(span))}`)
+export const presetLabel = (id, available) =>
+  id === 'all' ? `All saved weeks (${available})` : `Last ${weeksWord(Number(id))}`
 
 const fmtShort = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
 /**
- * span: '4' | '8' | '12' | 'all', the number of complete weeks to show (the week in progress is
+ * span: a whole number as text ('1', '4', '8', ...) or 'all', the number of complete weeks to show (the week in progress is
  * always added). Returns the weeks, the roster tickets, and how many complete weeks exist.
  */
 export function buildWeeks(data, span = defaultSpan(), cfg = config) {

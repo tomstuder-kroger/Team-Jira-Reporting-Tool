@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import cfgExample from '../../config/report.config.example.json'
-import { buildWeeks, velocity, openByStatus, closedByDesigner, weekStart } from './weeks.js'
+import { buildWeeks, velocity, openByStatus, closedByDesigner, weekStart, effectiveSpan, loadSpanChoice, defaultSpanChoice, presetLabel, spanText } from './weeks.js'
 
 // Synthetic data only. Times are built from local dates so the tests hold in any time zone.
 // 2026-11-01 is a Sunday, so the weeks below start Oct 18, Oct 25 and Nov 1; the pull is Wed Nov 4.
@@ -82,6 +82,73 @@ describe('buildWeeks', () => {
   it('returns zeros, not NaN, for empty data', () => {
     const res = buildWeeks(make([]), '4', cfg)
     expect(res.weeks.every((w) => w.opened === 0 && w.closed === 0 && w.net === 0)).toBe(true)
+  })
+})
+
+describe('the weeks-shown choice', () => {
+  const avail = (n) => buildWeeks(make([]), 'all', cfg).available
+
+  it('shows 1 or 2 complete weeks plus the week in progress', () => {
+    expect(buildWeeks(make([]), '1', cfg).weeks).toHaveLength(2)
+    expect(buildWeeks(make([]), '2', cfg).weeks).toHaveLength(3)
+    expect(buildWeeks(make([]), '1', cfg).weeks.at(-1).partial).toBe(true)
+  })
+
+  it('velocity still works with one complete week', () => {
+    const v = velocity(buildWeeks(make([T('EX-1', 'Closed', R0, [], at(10, 27), at(10, 28))]), '1', cfg))
+    expect([v.averageWeeks, v.average, v.best, v.low]).toEqual([1, 1, 1, 1])
+  })
+
+  it('passes a preset through, and keeps a custom number between 1 and the weeks saved', () => {
+    const a = avail()
+    expect(effectiveSpan({ choice: '4', custom: 99 }, a)).toBe('4')
+    expect(effectiveSpan({ choice: 'all', custom: 3 }, a)).toBe('all')
+    expect(effectiveSpan({ choice: 'custom', custom: 3 }, a)).toBe('3')
+    expect(effectiveSpan({ choice: 'custom', custom: 9999 }, a)).toBe(String(a))
+    expect(effectiveSpan({ choice: 'custom', custom: 0 }, a)).toBe('1')
+    expect(effectiveSpan({ choice: 'custom', custom: -4 }, a)).toBe('1')
+    expect(effectiveSpan({ choice: 'custom', custom: 2.5 }, a)).toBe('1')
+    expect(effectiveSpan({ choice: 'custom', custom: NaN }, a)).toBe('1')
+    expect(effectiveSpan({ choice: 'custom', custom: 5 }, 0)).toBe('1')
+  })
+
+  it('a custom number of weeks builds that many weeks', () => {
+    expect(buildWeeks(make([]), effectiveSpan({ choice: 'custom', custom: 6 }, avail()), cfg).weeks).toHaveLength(7)
+  })
+
+  it('words singular and plural correctly', () => {
+    expect(presetLabel('1', 20)).toBe('Last 1 week')
+    expect(presetLabel('2', 20)).toBe('Last 2 weeks')
+    expect(presetLabel('all', 20)).toBe('All saved weeks (20)')
+    expect(spanText('1', 20)).toBe('the last 1 week')
+    expect(spanText('6', 20)).toBe('the last 6 weeks')
+    expect(spanText('all', 20)).toBe('all saved weeks')
+  })
+
+  describe('the saved choice', () => {
+    afterEach(() => { delete globalThis.localStorage })
+    const store = (v) => { globalThis.localStorage = { getItem: () => v, setItem() {} } }
+
+    it('loads a saved preset or custom choice', () => {
+      store(JSON.stringify({ choice: 'custom', custom: 10 }))
+      expect(loadSpanChoice()).toEqual({ choice: 'custom', custom: 10 })
+      store(JSON.stringify({ choice: '2', custom: 4 }))
+      expect(loadSpanChoice()).toEqual({ choice: '2', custom: 4 })
+    })
+    it('still reads the plain text an earlier version saved', () => {
+      store('12')
+      expect(loadSpanChoice()).toEqual({ choice: '12', custom: defaultSpanChoice().custom })
+      store('all')
+      expect(loadSpanChoice().choice).toBe('all')
+    })
+    it('falls back to 8 weeks for junk, and repairs a bad custom number', () => {
+      for (const junk of ['{nope', 'banana', JSON.stringify({ choice: 'banana' }), null]) {
+        store(junk)
+        expect(loadSpanChoice()).toEqual(defaultSpanChoice())
+      }
+      store(JSON.stringify({ choice: 'custom', custom: -3 }))
+      expect(loadSpanChoice()).toEqual({ choice: 'custom', custom: defaultSpanChoice().custom })
+    })
   })
 })
 
