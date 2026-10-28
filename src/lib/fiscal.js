@@ -53,3 +53,44 @@ export function fiscalPosition(date) {
   }
   return null
 }
+
+// ---- Quarters by key, for the capacity page ----
+// A key looks like "FY2026-Q4". Years in ASSUMED_YEARS use the same 16/12/12/12 week pattern but
+// have not been checked against a printed calendar (the sibling capacity app has FY2027 as 13/13/13/13).
+const ASSUMED_YEARS = [2027]
+
+export const quarterKey = (year, quarter) => `FY${year}-Q${quarter}`
+
+export function parseQuarterKey(key) {
+  const m = /^FY(\d{4})-Q([1-4])$/.exec(key ?? '')
+  return m ? { year: Number(m[1]), quarter: Number(m[2]) } : null
+}
+
+/** { key, year, quarter, start, end, weeks, assumed } for a known quarter (end is the last day), else null. */
+export function quarterInfo(year, quarter) {
+  const startIso = YEAR_STARTS[year]
+  if (!startIso || !Number.isInteger(quarter) || quarter < 1 || quarter > 4) return null
+  const start = isoToDayNumber(startIso)
+  const first = start + QUARTER_FIRST_PERIOD[quarter - 1] * PERIOD_DAYS
+  const last = start + (QUARTER_LAST_PERIOD[quarter - 1] + 1) * PERIOD_DAYS - 1
+  return {
+    key: quarterKey(year, quarter),
+    year,
+    quarter,
+    start: dayNumberToLocal(first),
+    end: dayNumberToLocal(last),
+    weeks: (last - first + 1) / 7,
+    assumed: ASSUMED_YEARS.includes(year),
+  }
+}
+
+/** Every quarter the calendar knows, oldest first. */
+export function fiscalQuarters() {
+  return Object.keys(YEAR_STARTS).map(Number).sort((a, b) => a - b).flatMap((y) => [1, 2, 3, 4].map((q) => quarterInfo(y, q)))
+}
+
+/** The quarter key containing the date, or null outside the known years. */
+export function currentQuarterKey(date) {
+  const pos = fiscalPosition(date)
+  return pos ? quarterKey(pos.year, pos.quarter) : null
+}

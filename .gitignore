@@ -14,6 +14,7 @@ id_ed25519*
 # ---- Business data and config that live only on this machine ----
 # Real roster, Jira site, project keys and field IDs
 config/report.config.json
+config/capacity.json
 # Pulled Jira tickets: titles, names, dates
 public/data/*
 !public/data/.gitkeep

@@ -12,6 +12,7 @@ const NAV_ACTION =
 const PAGES = [
   { id: 'dashboard', label: 'Dashboard', href: '#/' },
   { id: 'reports', label: 'Reports', href: '#/reports' },
+  { id: 'capacity', label: 'Capacity', href: '#/capacity' },
   { id: 'roster', label: 'Roster', href: '#/roster' },
 ]
 

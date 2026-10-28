@@ -2,10 +2,11 @@
 
 A dashboard of what the product design team did in Jira: tickets closed, in progress, awaiting PM review and blocked, per designer, for a date range you choose (including past periods and a comparison with an earlier one), plus a list of designers with no activity.
 
-There are three pages, linked in the header:
+There are four pages, linked in the header:
 
 - **Dashboard:** summary tiles, active blockers, and one card per designer (grid or list, sortable, filterable, each card can be hidden down to its counts).
 - **Reports:** tickets opened and closed by week, blocked over time, open work by status, closed by designer, and velocity.
+- **Capacity:** each designer's planned share of their time by portfolio for a fiscal quarter, with a team view.
 - **Roster:** add or remove the designers who are tracked, by searching Jira.
 
 It runs on your machine at `http://127.0.0.1:5173` and is meant to stay there. The Jira key it uses never leaves this computer.
@@ -86,6 +87,29 @@ Above the cards on the Dashboard:
 - **Layout:** **Grid** (cards side by side, as before) or **List** (one full-width card per person). Your layout and sort are remembered in the browser.
 - **Hide or show:** each card's name has an arrow. Hiding a card keeps the name, the assigned and paired counts, and the status badges (closed, in progress, PM review, blocked) and hides the ticket lists and the note. **Show all** and **Hide all** do every card at once. Which cards are hidden is not remembered, so every visit starts with all shown.
 
+## Capacity page
+
+Choose **Capacity** in the header (the address ends in `#/capacity`). It follows the capacity planning app's method, in weeks, per Kroger fiscal quarter. **It does not read Jira and does not use story points.** You type the plan in.
+
+1. Pick a **fiscal quarter** (it opens on the one containing today).
+2. Under **Portfolios and teams**, add the portfolios and teams you use. You can rename or remove them. Renaming updates every percentage already entered; removing a portfolio deletes its percentages in all quarters, and removing a team takes it off everyone who was on it.
+3. In the table, give each designer their **teams** (one or several), their **time off** in weeks for that quarter, and a **percentage for each portfolio**.
+4. Choose **Save plan**. **Discard changes** drops what you typed since the last save.
+
+How it is worked out:
+
+- **Available weeks** = the weeks in the quarter (16 in Q1, 12 in Q2 to Q4 for FY2026) minus time off, never below zero.
+- **Planned weeks** for a portfolio = available weeks times its percentage.
+- **Total** is the sum of a person's percentages. **Under** is below 90%, **fully allocated** is 90 to 100%, **over** is above 100%, and nothing entered is **not planned**.
+- A total above 100% **saves**, and shows in red with how far over it is, so a plan can be saved while it is being worked out.
+- The top tiles show team utilization (planned weeks of available weeks), available and planned weeks, and how many people are over 100% or not planned. A chart shows planned weeks per portfolio, and utilization is listed by team.
+- Time off is one number of weeks for the quarter. If you track it in the capacity planning app as OKR, dev, holiday and PTO days, add those up and divide by five.
+- **FY2027 quarters are flagged as assumed**, and the capacity planning app lists FY2027 as 13 weeks per quarter while this app assumes 16/12/12/12. Confirm against Kroger's printed calendar before relying on FY2027 available weeks.
+
+The plan is saved in `config/capacity.json` on this computer, which is **git-ignored** because it holds real names and portfolio names. Each save keeps the previous version as `config/capacity.backup.json`. `config/capacity.example.json` (made-up values) is committed so a fresh clone has a template. Saving writes only that file and never changes anything in Jira.
+
+Not built yet: comparing the plan with the work Jira shows (planned share against tickets closed by portfolio). Jira's own portfolio field is empty, so that would map parent epics to your portfolios.
+
 ## Change who is tracked
 
 **Use the Roster page** (header link, address ends in `#/roster`). Type part of a name, pick the person Jira finds, then **Save roster**. Remove someone with **Remove** (**Undo** brings them back before you save). Nothing changes until you save, and **Discard changes** throws away your edits.
@@ -142,6 +166,7 @@ Choose **Reports** in the header (the address ends in `#/reports`). Pick how man
 
 ```
 config/report.config.json      roster, projects, status mapping, history length (git-ignored; see below)
+config/capacity.json           capacity plan: portfolios, teams, time off, percentages (git-ignored)
 public/data/report.json        generated data the page loads (git-ignored, do not edit)
 server/                        refresh and roster endpoints, read-only Jira client, with tests
 scripts/                       merge step, CLI refresh, credential check
@@ -156,7 +181,7 @@ CLAUDE.md                      background, rules, definitions and status for Cla
 
 ## Keeping it safe to publish
 
-This repository is public, so only synthetic data goes into it. `.gitignore` keeps these on your machine: `.env` (the key), `config/report.config.json` (your roster, Jira site, project keys and field IDs), `public/data/*` (pulled tickets), `data-raw/` (backups), and `CLAUDE.local.md`. The committed `config/report.config.example.json` has made-up values, and a fresh clone shows a banner until you copy it to `report.config.json` and fill it in.
+This repository is public, so only synthetic data goes into it. `.gitignore` keeps these on your machine: `.env` (the key), `config/report.config.json` (your roster, Jira site, project keys and field IDs), `config/capacity.json` (portfolio and team names with each person's percentages), `public/data/*` (pulled tickets), `data-raw/` (backups), and `CLAUDE.local.md`. The committed `config/report.config.example.json` has made-up values, and a fresh clone shows a banner until you copy it to `report.config.json` and fill it in.
 
 Before every commit, check what is staged and look for leaks:
 
@@ -173,7 +198,7 @@ If a key is ever committed, treat it as exposed: revoke it at https://id.atlassi
 npm test
 ```
 
-174 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster page's save and search endpoints, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
+222 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster and capacity endpoints, the capacity math, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
 
 ## Packages
 
@@ -190,6 +215,7 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 - Time spent in each status (for example days in PM review).
 - A drill-down per designer.
 - Story-point velocity, once the team settles on one story-point field.
+- Capacity compared with Jira work (planned share against tickets closed by portfolio).
 - A scheduled digest (deferred on request).
 
 ## Limits to know

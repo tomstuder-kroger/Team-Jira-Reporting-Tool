@@ -4,10 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 import { createRefreshHandler } from './server/api.mjs'
 import { createRosterHandler } from './server/roster.mjs'
+import { createCapacityHandler } from './server/capacity.mjs'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 
-// Adds POST /api/refresh and the roster endpoints (/api/roster, /api/users/search) to the dev server. Credentials come from .env and never reach the browser.
+// Adds POST /api/refresh, the roster endpoints (/api/roster, /api/users/search) and /api/capacity to the dev server. Credentials come from .env and never reach the browser.
 function jiraRefreshApi() {
   return {
     name: 'jira-refresh-api',
@@ -15,6 +16,7 @@ function jiraRefreshApi() {
       const env = loadEnv(server.config.mode, root, '')
       server.middlewares.use(createRefreshHandler({ root, env }))
       server.middlewares.use(createRosterHandler({ root, env }))
+      server.middlewares.use(createCapacityHandler({ root }))
     },
   }
 }

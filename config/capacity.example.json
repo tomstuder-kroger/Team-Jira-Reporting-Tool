@@ -1,0 +1,15 @@
+{
+  "portfolios": ["Portfolio A", "Portfolio B", "Shared work"],
+  "teams": ["Team One", "Team Two"],
+  "people": {
+    "Doe, Jamie": {
+      "teams": ["Team One", "Team Two"],
+      "timeOff": { "FY2026-Q4": 2 },
+      "allocations": { "FY2026-Q4": { "Portfolio A": 60, "Portfolio B": 30 } }
+    },
+    "Roe, Alex (NonEmp)": {
+      "teams": ["Team Two"],
+      "allocations": { "FY2026-Q4": { "Portfolio B": 100 } }
+    }
+  }
+}

@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-A dashboard of Jira activity for the product design team. Three pages (hash routes): **Dashboard** (per-designer cards for a chosen date range, summary tiles, open blockers, a table of designers with no activity), **Reports** (opened/closed by week, blocked over time, open by status, closed by designer, velocity) and **Roster** (add/remove tracked designers by searching Jira). The look follows `capacity-planning-app`: Kroger header and logo, DM Sans and Nunito, shadcn tokens, and a KDS message (`kds-message` from MX Web) for the refresh notice.
+A dashboard of Jira activity for the product design team. Four pages (hash routes): **Dashboard** (per-designer cards for a chosen date range, summary tiles, open blockers, a table of designers with no activity), **Reports** (opened/closed by week, blocked over time, open by status, closed by designer, velocity) **Capacity** (planned % by portfolio per person per fiscal quarter, in weeks; typed in, not from Jira) and **Roster** (add/remove tracked designers by searching Jira). The look follows `capacity-planning-app`: Kroger header and logo, DM Sans and Nunito, shadcn tokens, and a KDS message (`kds-message` from MX Web) for the refresh notice.
 
 Owner: the product design lead. Audience: design leadership. **Localhost only, by decision.** The Jira key lives in `.env` on this machine and the app is not to be hosted or shared.
 
@@ -12,7 +12,7 @@ Owner: the product design lead. Audience: design leadership. **Localhost only, b
 
 ```bash
 npm start                                   # dev server and refresh endpoint, http://127.0.0.1:5173
-npm test                                    # vitest, runs once (174 tests)
+npm test                                    # vitest, runs once (222 tests)
 npm run build                               # production build to dist/
 npm run data:jira                           # same refresh as the header button, from the terminal
 node --env-file=.env scripts/jira-check.mjs # checks the credentials, prints status codes only
@@ -42,6 +42,9 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 | `public/data/report.json` | Generated. Do not hand-edit. |
 | `server/api.mjs` | `POST /api/refresh` middleware: localhost Host and same-origin checks, 15 s cooldown, shares one Jira call between overlapping clicks. |
 | `server/guard.mjs`, `config.mjs` | Shared localhost/same-origin check, JSON body reader, and config reader used by every endpoint. |
+| `server/capacity.mjs` | GET/PUT `/api/capacity`. Validates and saves the capacity plan to the git-ignored `config/capacity.json` (backup, atomic write). Never calls Jira. |
+| `src/lib/capacity.js` | Capacity math (weeks per fiscal quarter, % by portfolio, 90/100 status, roll-ups) and edit helpers. Pure functions. |
+| `src/components/CapacityPage.jsx`, `LabelList.jsx`, `PortfolioBars.jsx` | The Capacity page and its parts. |
 | `server/roster.mjs` | Roster page endpoints: GET/PUT `/api/roster`, GET `/api/users/search`. Writes only the `roster` key of the local config, with a backup and an atomic write. |
 | `server/jira.mjs` | Read-only Jira client: POST `/rest/api/3/search/jql` and POST `/rest/api/3/changelog/bulkfetch` (both only read), follows `nextPageToken`, 30 s timeout, plain-language errors. `created` in the bulk response is epoch milliseconds, not an ISO string. |
 | `server/queries.mjs` | Builds the one JQL search and validates config. |
@@ -53,7 +56,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 | `src/lib/designers.js` | Dashboard card sort (last name, A-Z, Z-A, or needs-attention order), name filter, saved layout (`dar.view`). Pure functions. |
 | `src/lib/history.js` | Status replay and the activity rule. Pure functions. |
 | `src/lib/today.js` | `useToday()`: today's date, refreshed each minute and when the tab becomes visible. |
-| `src/lib/fiscal.js` | Kroger fiscal calendar. |
+| `src/lib/fiscal.js` | Kroger fiscal calendar, including quarters by key (`FY2026-Q4`), their weeks, and an `assumed` flag for FY2027. |
 | `src/lib/weeks.js` | Reports page maths: Sunday-start weeks, opened and closed per week, velocity, open by status, closed by designer. Pure functions. |
 | `src/lib/blocked.js` | Blocked spells from each ticket's status history, per-week blocked counts, days blocked. Pure functions. |
 | `src/lib/route.js` | Hash route (`#/reports`, `#/roster`, else dashboard). No router library. |
@@ -89,7 +92,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 ## Tests
 
-174 tests in nine files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution, compare with a preset), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `server/roster.test.js` (roster validation and save, backup, endpoint guards, user search leaks no email or ID), `src/lib/designers.test.js` (last-name sort, name filter, saved layout), `src/components/DesignerCard.test.jsx` (hidden card keeps name, counts and badges), `src/lib/history.test.js` (status replay, activity rule, open at end), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split, the weeks-shown choice incl. custom; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
+222 tests in thirteen files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution, compare with a preset), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `server/roster.test.js` (roster validation and save, backup, endpoint guards, user search leaks no email or ID), `src/lib/capacity.test.js` (quarter lengths, available and planned weeks, status thresholds, roll-ups, edits), `server/capacity.test.js` (capacity plan validation, atomic save and backup, endpoint guards), `src/components/CapacityParts.test.jsx` (bars, label list), `src/components/StatusDonut.test.jsx` (ring fits its drawing area), `src/lib/designers.test.js` (last-name sort, name filter, saved layout), `src/components/DesignerCard.test.jsx` (hidden card keeps name, counts and badges), `src/lib/history.test.js` (status replay, activity rule, open at end), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split, the weeks-shown choice incl. custom; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
 
 ## Stale pieces
 
@@ -101,8 +104,16 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 - **Built, in this order:** theme and header; live refresh from Jira; date ranges and factual notes; Wave 4 Reports page; Wave 5a status history (blocked over time, days blocked); Wave 5b Roster page; Wave 6 date range rework (this/last week, period, quarter, fiscal year to date, custom start and end, compare, status-change activity rule, statuses as at the end of the range, 366 days of history); Dashboard card controls (grid/list, show/hide that keeps name, counts and badges, last-name sort, name filter). Filter and sort affect only the cards and the no-activity table, never the tiles or blockers. Hidden cards are not remembered across visits; layout and sort are.
 - **Seen by the owner:** the owner said everything looks good for now. Claude has never looked at a browser, and tests cover the numbers, not the visuals; phone width, dark mode and every range have not been checked systematically.
-- **Next:** story-point velocity, only once the owner names the field. **Later:** per-designer drill-down, time spent in each status. **Deferred on request:** scheduled digest.
+- **Wave 7a built (Capacity page; not yet seen by the owner in a browser):** planned % by portfolio per person per fiscal quarter, team and portfolio roll-ups, status at 90/100%. **Next:** Wave 7b (compare the plan with Jira: map parent epics to portfolios, needs data version 4 with each ticket's epic, not started). Story-point velocity, only once the owner names the field (only one of the four candidate story-point fields has any data, set on 72% of closed tickets and 28% of open ones; its ID is in the git-ignored `CLAUDE.local.md`). **Later:** per-designer drill-down, time spent in each status. **Deferred on request:** scheduled digest.
 - **Chores still open:** rewrite or delete the out-of-date skill (see Stale pieces); spot-check one past week's closed count against Jira; confirm FY2027 dates; find out whether the Jira key is read-only.
+
+## Capacity definitions
+
+- **Method (from the sibling capacity planning app):** weeks per fiscal quarter. Available = quarter weeks minus time off (floor 0). Planned = available x allocation %. Status: under below 90, fully allocated 90 to 100, over above 100, "not planned" at 0. A total above 100% saves and is flagged, never blocked. Story points are not used; Jira is not read.
+- **Data:** `config/capacity.json` (git-ignored, real names) `{ portfolios, teams, people: { "<roster name>": { teams: [..], timeOff: { "FY2026-Q4": weeks }, allocations: { "FY2026-Q4": { "<portfolio>": whole % } } } } }`. Percentages are per person per quarter; portfolios and teams are quarter-agnostic labels the owner defines. **A person can be on several teams and split across several portfolios.** Team roll-ups count a multi-team person in full under each team, so team rows do not add up to the total; the page says so. The older single `team` value is still read. Renaming or removing a label updates every person. The example is `config/capacity.example.json` (fake).
+- **Writes:** only that file, only from the Capacity page, localhost and same-origin, with a backup and an atomic write. Validation lives in `cleanCapacity` (`server/capacity.mjs`).
+- **Calendar caveat:** the sibling app lists FY2027 as 13/13/13/13 weeks; this app assumes 16/12/12/12. Unverified, flagged on the page, and it changes available weeks.
+- **Why not Jira:** Product Portfolio is empty on every ticket; due date is on 5 of 145 open tickets; Story Points on 28% of open tickets. Team is on 705 of 711 tickets with 25 values, meaning unconfirmed. 690 tickets have a parent epic (106 epics), the likely basis for 7b.
 
 ## Blocked definitions
 

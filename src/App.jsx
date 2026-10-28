@@ -3,6 +3,7 @@ import Header from '@/components/Header'
 import Dashboard from '@/components/Dashboard'
 import ReportsPage from '@/components/ReportsPage'
 import RosterPage from '@/components/RosterPage'
+import CapacityPage from '@/components/CapacityPage'
 import KdsNotice from '@/components/KdsNotice'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { usingExampleConfig } from '@/lib/config'
@@ -100,6 +101,7 @@ export default function App() {
         )}
 
         {route === 'roster' && <RosterPage onRefresh={jira.refresh} refreshing={jira.busy} />}
+        {route === 'capacity' && <CapacityPage />}
         {data && route === 'reports' && <ReportsPage data={data} />}
         {data && route === 'dashboard' && <Dashboard data={data} />}
       </main>
