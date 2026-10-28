@@ -59,4 +59,24 @@ describe('mergeReport', () => {
     expect(data.tickets[0].pair).toEqual(['B, Bo'])
     expect(data.tickets[0].c).toBeNull()
   })
+
+  it('keeps status history sorted, in UTC, and drops malformed entries', () => {
+    const { data } = run([row({ h: [
+      ['2026-10-20T10:00:00.000-0400', 'In Progress', 'Blocked'],
+      ['2026-10-10T10:00:00.000-0400', 'Open', 'In Progress'],
+      ['not a date', 'a', 'b'],
+      ['2026-10-25T10:00:00.000Z', 'Blocked'],
+      null,
+    ] })])
+    expect(data.tickets[0].h).toEqual([
+      ['2026-10-10T14:00:00.000Z', 'Open', 'In Progress'],
+      ['2026-10-20T14:00:00.000Z', 'In Progress', 'Blocked'],
+    ])
+  })
+
+  it('gives an empty history when none was supplied, and drops history with non-roster tickets', () => {
+    const { data } = run([row(), row({ k: 'X-2', a: 'Dev, Dee', pair: [], h: [['2026-10-10T10:00:00.000Z', 'Open', 'Blocked']] })])
+    expect(data.tickets).toHaveLength(1)
+    expect(data.tickets[0].h).toEqual([])
+  })
 })

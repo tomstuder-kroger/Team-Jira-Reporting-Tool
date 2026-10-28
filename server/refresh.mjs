@@ -22,7 +22,7 @@ const FIELDS = (cfg) => ['summary', 'status', 'assignee', cfg.pairFieldId, 'crea
 
 /**
  * Query Jira and build the next report.json. Does not write anything.
- * client: { searchAll(jql, fields) }
+ * client: { searchAll(jql, fields), statusHistory(issueIds) }
  */
 export async function refreshReport({ cfg, client, now = new Date() }) {
   const q = buildQueries(cfg)
@@ -31,7 +31,11 @@ export async function refreshReport({ cfg, client, now = new Date() }) {
   // An empty answer for a whole roster means something is wrong. Keep the old file rather than wipe it.
   if (issues.length === 0) throw new JiraError('Jira returned no tickets for the roster, so the saved data was left as it was.')
 
-  const { data, warnings } = mergeReport({ pool: issues.map((i) => toPoolRow(i, cfg)), config: cfg, now: now.toISOString() })
+  // Status history for every ticket found. If this fails the whole refresh fails and the old file stays.
+  const history = await client.statusHistory(issues.map((i) => String(i.id)).filter((id) => id !== 'undefined'))
+  const pool = issues.map((i) => ({ ...toPoolRow(i, cfg), h: history.get(String(i.id)) ?? [] }))
+
+  const { data, warnings } = mergeReport({ pool, config: cfg, now: now.toISOString() })
   const closed = data.tickets.filter((t) => t.r).length
   return {
     data,

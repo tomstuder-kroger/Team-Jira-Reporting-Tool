@@ -6,7 +6,10 @@ import WeeklyTable from '@/components/WeeklyTable'
 import StatusDonut from '@/components/StatusDonut'
 import ClosedByDesigner from '@/components/ClosedByDesigner'
 import VelocityTiles from '@/components/VelocityTiles'
+import BlockedChart from '@/components/BlockedChart'
+import BlockedTiles from '@/components/BlockedTiles'
 import { pulledLabel } from '@/lib/report'
+import { blockedOverTime } from '@/lib/blocked'
 import { buildWeeks, closedByDesigner, loadSpan, openByStatus, saveSpan, velocity } from '@/lib/weeks'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +24,7 @@ export default function ReportsPage({ data }) {
 
   const res = useMemo(() => buildWeeks(data, span), [data, span])
   const vel = useMemo(() => velocity(res), [res])
+  const blk = useMemo(() => blockedOverTime(res), [res])
   const open = useMemo(() => openByStatus(data), [data])
   const byDesigner = useMemo(() => closedByDesigner(res), [res])
   const complete = res.weeks.filter((w) => !w.partial).length
@@ -50,6 +54,7 @@ export default function ReportsPage({ data }) {
       </div>
 
       <VelocityTiles v={vel} />
+      <BlockedTiles b={blk} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,480px),1fr))] items-start gap-3.5">
         <Card>
@@ -65,7 +70,15 @@ export default function ReportsPage({ data }) {
             <CardTitle>Week by week</CardTitle>
             <CardDescription>net = opened minus closed</CardDescription>
           </CardHeader>
-          <WeeklyTable weeks={res.weeks} />
+          <WeeklyTable weeks={blk.weeks} />
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Blocked over time</CardTitle>
+            <CardDescription>from each ticket's status history</CardDescription>
+          </CardHeader>
+          <BlockedChart weeks={blk.weeks} />
         </Card>
 
         <Card>
@@ -86,7 +99,7 @@ export default function ReportsPage({ data }) {
       </div>
 
       <footer className="pt-1 text-center text-xs text-muted-foreground">
-        Opened counts tickets by created date and closed by resolved date, for tickets assigned to or paired with a tracked designer. A ticket opened and closed in the same week counts in both. A ticket that was reopened uses its latest resolved date. Weeks run Sunday to Saturday, and the week in progress ends at the last pull, so it is left out of averages. Velocity counts tickets, not story points. Blocked over time needs status history and is not shown yet.
+        Opened counts tickets by created date and closed by resolved date, for tickets assigned to or paired with a tracked designer. A ticket opened and closed in the same week counts in both. A ticket that was reopened uses its latest resolved date. Weeks run Sunday to Saturday, and the week in progress ends at the last pull, so it is left out of averages. Velocity counts tickets, not story points. Blocked comes from each ticket's status history: a block runs from the change into a Blocked status to the change out of it, or to the resolved time, or to the last pull if it is still blocked. A ticket whose first recorded change leaves Blocked counts as blocked since it was created. Tickets follow their current assignee, so a reassigned ticket's past blocks count for its current owner.
       </footer>
     </>
   )

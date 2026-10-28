@@ -1,4 +1,5 @@
 import config from './config.js'
+import { daysBlocked } from './blocked.js'
 
 export const LABEL = {
   closed: 'Closed',
@@ -100,6 +101,7 @@ export function buildReport(data, win, cfg = config) {
       issue: toItem(t),
       owner: { name: inRoster(t.a) ? t.a : t.pair.find(inRoster) },
       movedThisWeek: moved(t),
+      days: daysBlocked(t, new Date(data.meta.pulledAt).getTime(), cfg),
     }))
 
   const kpis = [

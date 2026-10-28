@@ -36,7 +36,7 @@ You may not know whether your key is read-only. Atlassian doesn't report that th
 
 ## Refresh the data
 
-Choose **Refresh from Jira** in the header. It takes a few seconds, saves the result, and shows a notice with the time and ticket counts. A few details:
+Choose **Refresh from Jira** in the header. It takes a few seconds (two read-only calls: the ticket search, then the status history), saves the result, and shows a notice with the time and ticket counts. A few details:
 
 - **Data pulled** (top right of the page) is the real time Jira was last queried. The page does not re-query Jira on its own.
 - Clicking twice within 15 seconds reuses the first result.
@@ -92,7 +92,10 @@ Choose **Reports** in the header (the address ends in `#/reports`). Pick how man
 - **Velocity, without story points:** average tickets closed per week over the last four complete weeks, best and lowest week, and median days from created to resolved. The week in progress is left out of the average.
 - A ticket opened and closed in the same week counts in both columns. A reopened ticket uses its latest resolved date.
 - **Watch for bulk closes.** A cleanup that closes dozens of tickets at once raises that week's count and the average. The median time to close is steadier.
-- Not shown yet: blocked over time and days blocked (these need status history), and story-point velocity.
+- **Blocked over time:** a chart of tickets blocked at the end of each week, plus "New blocks" and "Blocked at end" columns in the weekly table. Three tiles show tickets blocked now, the longest current block in days, and the median days of blocks that ended in the weeks shown.
+- A block runs from the change into a Blocked status to the change out of it, or to the resolved time, or to the last refresh if it is still blocked. If a ticket's first recorded change leaves Blocked, it counts as blocked since it was created.
+- On the Dashboard, each active blocker also shows how many days it has been blocked.
+- Not shown yet: story-point velocity.
 
 ## What the page is made of
 
@@ -107,7 +110,7 @@ config/report.config.json      roster, projects, status mapping, history length
 public/data/report.json        generated data the page loads (do not edit)
 server/                        refresh endpoint and Jira client (read-only), with tests
 scripts/                       merge step, CLI refresh, credential check
-src/lib/                       counting (report.js), ranges (windows.js), fiscal calendar (fiscal.js), weekly counts (weeks.js), page route (route.js)
+src/lib/                       counting (report.js), ranges (windows.js), fiscal calendar (fiscal.js), weekly counts (weeks.js), blocked spells (blocked.js), page route (route.js)
 src/components/                header, dashboard, reports page and its charts, range menu, tiles, cards, table
 .env                           your Jira key (git-ignored, you create it)
 CLAUDE.md                      background, rules, and Wave 4 notes for Claude Code
@@ -132,7 +135,7 @@ If a key is ever committed, treat it as exposed: revoke it at https://id.atlassi
 npm test
 ```
 
-75 tests, none needing the network: the counting rules, the weekly counts and velocity, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
+97 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
 
 ## Packages
 
@@ -146,7 +149,7 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 
 ## What is not built yet
 
-- Status history, which gives blocked over time, days blocked, and the date a ticket closed.
+- Time spent in each status (for example days in PM review).
 - A settings page for the roster, and a drill-down per designer.
 - A scheduled digest (deferred on request).
 
@@ -158,3 +161,7 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 - **FY2027 dates are assumed**, not checked against a printed calendar. FY2026 was checked. After FY2027 the fiscal presets disappear.
 - The Jira key may not be read-only (see setup).
 - Layout at phone width and in dark mode hasn't been checked in a browser.
+
+## After upgrading to the status-history version
+
+The saved file format changed (version 3). The page shows "report.json is in an older format" until you choose **Refresh from Jira** once. The refresh now makes a second read-only call for each ticket's status changes, and the file is about 60 KB larger. Statuses that appear in a ticket's history but are not listed in `statusBuckets` (for example old workflow steps) do not affect the blocked numbers, because only Blocked matters there.

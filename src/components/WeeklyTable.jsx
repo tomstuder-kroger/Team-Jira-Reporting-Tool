@@ -8,14 +8,16 @@ export default function WeeklyTable({ weeks }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[420px] border-collapse text-sm tabular-nums">
+      <table className="w-full min-w-[520px] border-collapse text-sm tabular-nums">
         <caption className="sr-only">Tickets opened and closed per week</caption>
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
             <th scope="col" className="py-2 pr-3 font-medium">Week</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Opened</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Closed</th>
-            <th scope="col" className="py-2 pl-3 text-right font-medium" title="Opened minus closed. Positive means the backlog grew.">Net</th>
+            <th scope="col" className="px-3 py-2 text-right font-medium" title="Opened minus closed. Positive means the backlog grew.">Net</th>
+            <th scope="col" className="px-3 py-2 text-right font-medium" title="Blocks that started this week">New blocks</th>
+            <th scope="col" className="py-2 pl-3 text-right font-medium" title="Tickets blocked when the week ended">Blocked at end</th>
           </tr>
         </thead>
         <tbody>
@@ -27,7 +29,9 @@ export default function WeeklyTable({ weeks }) {
               </th>
               <td className="px-3 py-2 text-right">{w.opened}</td>
               <td className="px-3 py-2 text-right">{w.closed}</td>
-              <td className="py-2 pl-3 text-right text-muted-foreground">{signed(w.net)}</td>
+              <td className="px-3 py-2 text-right text-muted-foreground">{signed(w.net)}</td>
+              <td className="px-3 py-2 text-right">{w.newlyBlocked}</td>
+              <td className="py-2 pl-3 text-right">{w.blockedAtEnd}</td>
             </tr>
           ))}
         </tbody>
@@ -36,7 +40,9 @@ export default function WeeklyTable({ weeks }) {
             <th scope="row" className="py-2 pr-3 text-left">Complete weeks ({done.length})</th>
             <td className="px-3 py-2 text-right">{sum('opened', done)}</td>
             <td className="px-3 py-2 text-right">{sum('closed', done)}</td>
-            <td className="py-2 pl-3 text-right">{signed(sum('net', done))}</td>
+            <td className="px-3 py-2 text-right">{signed(sum('net', done))}</td>
+            <td className="px-3 py-2 text-right">{sum('newlyBlocked', done)}</td>
+            <td className="py-2 pl-3 text-right">{done.at(-1)?.blockedAtEnd ?? 0}</td>
           </tr>
         </tfoot>
       </table>

@@ -17,7 +17,7 @@ function useReportData() {
       const res = await fetch(`/data/report.json?t=${Date.now()}`, { cache: 'no-store' })
       if (!res.ok) throw new Error(`report.json returned ${res.status}`)
       const data = await res.json()
-      if (data?.version !== 2) throw new Error('report.json is in an older format')
+      if (data?.version !== 3) throw new Error('report.json is in an older format')
       if (!data?.meta?.pulledAt || !Array.isArray(data?.tickets)) throw new Error('report.json is missing meta or tickets')
       setState({ status: 'ready', data, error: null })
     } catch (e) {

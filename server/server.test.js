@@ -15,6 +15,7 @@ const CLOUD = '00000000-0000-4000-8000-000000000000'
 const TOKEN = 'SECRET-TOKEN-VALUE'
 const issue = (key, status, assignee, pair = [], summary = `title ${key}`) => ({
   key,
+  id: String(10000 + Number(key.replace(/\D/g, '') || 0)),
   fields: {
     summary,
     status: { name: status },
@@ -108,6 +109,57 @@ describe('Jira client', () => {
   })
 })
 
+describe('Jira client status history', () => {
+  const make = (fetchImpl) => createJiraClient({ email: 'a@b.c', token: TOKEN, cloudId: CLOUD, fetchImpl })
+  const log = (issueId, ...changes) => ({ issueId, changeHistories: changes.map(([created, from, to, field = 'status']) => ({ created: new Date(created).getTime(), items: [{ field, fromString: from, toString: to }] })) })
+
+  it('collects status changes per issue, ignores other fields, and follows nextPageToken', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(json(200, { issueChangeLogs: [log('1', ['2026-10-01T10:00:00.000Z', 'Open', 'In Progress'], ['2026-10-02T10:00:00.000Z', 'a', 'b', 'assignee'])], nextPageToken: 'p2' }))
+      .mockResolvedValueOnce(json(200, { issueChangeLogs: [log('2', ['2026-10-03T10:00:00.000Z', 'In Progress', 'Blocked'])] }))
+    const out = await make(fetchImpl).statusHistory(['1', '2'])
+    expect(out.get('1')).toEqual([['2026-10-01T10:00:00.000Z', 'Open', 'In Progress']])
+    expect(out.get('2')).toEqual([['2026-10-03T10:00:00.000Z', 'In Progress', 'Blocked']])
+    const [url, init] = fetchImpl.mock.calls[0]
+    expect(url).toBe(`https://api.atlassian.com/ex/jira/${CLOUD}/rest/api/3/changelog/bulkfetch`)
+    expect(JSON.parse(init.body)).toMatchObject({ issueIdsOrKeys: ['1', '2'], fieldIds: ['status'] })
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body).nextPageToken).toBe('p2')
+  })
+
+  it('reads created as epoch milliseconds, which is what the bulk endpoint returns, and skips unreadable times', async () => {
+    const ms = Date.UTC(2026, 9, 20, 14, 0, 0)
+    const body = { issueChangeLogs: [{ issueId: '1', changeHistories: [
+      { created: ms, items: [{ field: 'status', fromString: 'Open', toString: 'Blocked' }] },
+      { created: null, items: [{ field: 'status', fromString: 'Blocked', toString: 'Open' }] },
+    ] }] }
+    const out = await make(vi.fn().mockResolvedValue(json(200, body))).statusHistory(['1'])
+    expect(out.get('1')).toEqual([['2026-10-20T14:00:00.000Z', 'Open', 'Blocked']])
+  })
+
+  it('splits more than 1,000 tickets into separate requests', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(json(200, { issueChangeLogs: [] }))
+    await make(fetchImpl).statusHistory(Array.from({ length: 2300 }, (_, i) => String(i)))
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).issueIdsOrKeys).toHaveLength(1000)
+    expect(JSON.parse(fetchImpl.mock.calls[2][1].body).issueIdsOrKeys).toHaveLength(300)
+  })
+
+  it('fails rather than returning partial history, and never leaks the token', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(json(200, { issueChangeLogs: [log('1', ['2026-10-01T10:00:00.000Z', 'Open', 'Blocked'])], nextPageToken: 'p2' }))
+      .mockResolvedValueOnce(json(500, {}))
+    await expect(make(fetchImpl).statusHistory(['1'])).rejects.toThrow(/having problems/)
+    await expect(make(vi.fn().mockResolvedValue(json(200, { nope: true }))).statusHistory(['1'])).rejects.toThrow(/shape/)
+    try { await make(vi.fn().mockResolvedValue(json(401, {}))).statusHistory(['1']) } catch (e) { expect(e.message).not.toContain(TOKEN) }
+  })
+
+  it('returns an empty map for no tickets without calling Jira', async () => {
+    const fetchImpl = vi.fn()
+    expect((await make(fetchImpl).statusHistory([])).size).toBe(0)
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+})
+
 describe('toPoolRow', () => {
   it('reads assignee and Pair display names, tolerating missing fields', () => {
     expect(toPoolRow(issue('A-1', 'Open', 'Dev, Dee', ['Roe, Alex']), cfg)).toEqual({ k: 'A-1', t: 'title A-1', s: 'Open', a: 'Dev, Dee', pair: ['Roe, Alex'], c: '2026-10-01T10:00:00.000-0400', u: '2026-10-27T09:00:00.000-0400', r: null })
@@ -118,7 +170,7 @@ describe('toPoolRow', () => {
 
 describe('refreshReport', () => {
   const name = cfg.roster[0].jiraName
-  const client = (issues) => ({ searchAll: vi.fn().mockResolvedValueOnce(issues) })
+  const client = (issues, history = new Map()) => ({ searchAll: vi.fn().mockResolvedValueOnce(issues), statusHistory: vi.fn().mockResolvedValue(history) })
   const now = new Date('2026-11-04T15:00:00.000Z')
 
   it('makes one search, asks for the date fields, and returns versioned data with a summary', async () => {
@@ -126,10 +178,25 @@ describe('refreshReport', () => {
     const { data, summary } = await refreshReport({ cfg, client: c, now })
     expect(c.searchAll).toHaveBeenCalledTimes(1)
     expect(c.searchAll.mock.calls[0][1]).toEqual(expect.arrayContaining(['created', 'updated', 'resolutiondate', cfg.pairFieldId]))
-    expect(data.version).toBe(2)
+    expect(data.version).toBe(3)
     expect(data.meta.pulledAt).toBe('2026-11-04T15:00:00.000Z')
     expect(data.tickets.map((t) => [t.k, t.r !== null])).toEqual([['X-1', true], ['X-2', false]])
     expect(summary).toMatchObject({ tickets: 2, open: 1, closed: 1, historyDays: cfg.historyDays })
+  })
+
+  it('attaches status history to each ticket, asking for every ticket id in one call', async () => {
+    const hist = new Map([['10001', [['2026-10-20T10:00:00.000Z', 'In Progress', 'Blocked']]]])
+    const c = client([issue('X-1', 'Blocked', name), issue('X-2', 'Open', name)], hist)
+    const { data } = await refreshReport({ cfg, client: c, now })
+    expect(c.statusHistory).toHaveBeenCalledWith(['10001', '10002'])
+    expect(data.tickets.find((t) => t.k === 'X-1').h).toEqual([['2026-10-20T10:00:00.000Z', 'In Progress', 'Blocked']])
+    expect(data.tickets.find((t) => t.k === 'X-2').h).toEqual([])
+  })
+
+  it('fails the whole refresh when the history call fails, so nothing partial is saved', async () => {
+    const c = client([issue('X-1', 'Open', name)])
+    c.statusHistory.mockRejectedValue(new JiraError('Jira is having problems (500). Try again shortly.'))
+    await expect(refreshReport({ cfg, client: c, now })).rejects.toThrow(/having problems/)
   })
 
   it('refuses an empty answer so the saved file is not wiped', async () => {
@@ -156,7 +223,7 @@ describe('POST /api/refresh handler', () => {
     return root
   }
   const name = cfg.roster[0].jiraName
-  const okFetch = () => vi.fn().mockResolvedValue(json(200, { issues: [issue('X-1', 'Closed', name)], isLast: true }))
+  const okFetch = () => vi.fn().mockImplementation(async (url) => (url.includes('changelog/bulkfetch') ? json(200, { issueChangeLogs: [] }) : json(200, { issues: [issue('X-1', 'Closed', name)], isLast: true })))
   const env = { JIRA_EMAIL: 'a@b.c', JIRA_API_TOKEN: TOKEN, JIRA_CLOUD_ID: CLOUD }
 
   const call = async (handler, { method = 'POST', url = '/api/refresh', headers = { host: '127.0.0.1:5173' } } = {}) => {
@@ -214,7 +281,7 @@ describe('POST /api/refresh handler', () => {
     await call(h)
     const second = await call(h)
     expect(second.res.body.skipped).toBe(true)
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledTimes(2) // one search and one history call, for the first click only
   })
 
   it('shares one Jira call between clicks that overlap', async () => {
@@ -222,6 +289,6 @@ describe('POST /api/refresh handler', () => {
     const h = createRefreshHandler({ root: mkRoot(), env, fetchImpl, minIntervalMs: 0 })
     const [a, b] = await Promise.all([call(h), call(h)])
     expect([a.res.statusCode, b.res.statusCode]).toEqual([200, 200])
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
   })
 })
