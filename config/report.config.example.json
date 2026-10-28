@@ -1,0 +1,42 @@
+{
+  "cloudId": "00000000-0000-4000-8000-000000000000",
+  "siteUrl": "https://your-company.atlassian.net",
+  "projects": [
+    "ABC",
+    "XYZ"
+  ],
+  "issueTypes": [
+    "Spike",
+    "Story",
+    "Epic",
+    "Bug",
+    "Task"
+  ],
+  "pairFieldId": "customfield_12345",
+  "pairJqlField": "cf[12345]",
+  "historyDays": 120,
+  "defaultRange": "last7",
+  "statusBuckets": {
+    "Closed": "closed",
+    "Blocked": "blocked",
+    "In Progress": "prog",
+    "PM Review": "review",
+    "Ready for Review": "review",
+    "Ready for Test": "review",
+    "Open": "open",
+    "In Discovery": "open",
+    "Selected": "open"
+  },
+  "defaultBucket": "open",
+  "roster": [
+    {
+      "jiraName": "Doe, Jamie"
+    },
+    {
+      "jiraName": "Roe, Alex (NonEmp)"
+    },
+    {
+      "jiraName": "Poe, Sam"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+# ---- Secrets and local credentials. Never commit these. ----
+.env
+.env.*
+!.env.example
+.npmrc
+.netrc
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# ---- Business data and config that live only on this machine ----
+# Real roster, Jira site, project keys and field IDs
+config/report.config.json
+# Pulled Jira tickets: titles, names, dates
+public/data/*
+!public/data/.gitkeep
+# Working files and backups from refreshes
+data-raw/
+*.backup.json
+*.before-*.json
+# Anything exported or screenshotted for a report
+exports/
+reports/
+Screenshot*
+*.xlsx
+*.csv
+
+# ---- Claude Code local-only files ----
+CLAUDE.local.md
+.claude/settings.local.json
+
+# ---- Build output, dependencies, tooling ----
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.log
+npm-debug.log*
+*.tmp
+.DS_Store
+.idea/
+.vscode/
