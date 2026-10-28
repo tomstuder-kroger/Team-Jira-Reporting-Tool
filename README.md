@@ -60,7 +60,13 @@ The **Date range** menu groups its choices:
 - **Fiscal:** this period (for example P10), last period, this quarter, last quarter, and fiscal year to date, from the Kroger fiscal calendar.
 - **Custom dates:** a start and an end date. Leave the end as the latest date to mean "up to the last refresh".
 
-**Compare with** shows each summary tile next to an earlier range: the fiscal period or quarter before a "last" choice, otherwise the range of the same length just before. Each tile says how much it changed ("+3 vs 12 before"). Green means better, red means worse, and plain grey means the direction is neither (in progress, in review). The choice is disabled when the earlier range reaches back past the saved data.
+**Compare with** shows each summary tile next to a second range, so you can see the change ("+3 vs 12 compared"). Green means better, red means worse, and plain grey means the direction is neither (in progress, in review). It offers:
+
+- **Nothing** (the default): no comparison.
+- **Previous range:** chosen for you. After "Last period" or "Last quarter" it is the fiscal period or quarter before; for anything else it is the range of the same length that ends where yours starts.
+- **Any range from the Date range menu** (last week, last period, last quarter, fiscal year to date, and so on), so you can compare This period with Last period.
+
+A choice is greyed out, with a short reason, when it is the range you are viewing, overlaps it, reaches back past the saved data, or starts after the last refresh. The page shows both ranges and their lengths in days next to the title. **When the two ranges differ in length** (for example 18 days of this period against all 28 of the last), a note under the tiles says so, because totals such as tickets closed are then not like for like.
 
 Changing any of this is instant and doesn't call Jira. Your choice is remembered in the browser.
 
@@ -113,7 +119,7 @@ Then choose Refresh from Jira.
 
 ## Reports page
 
-Choose **Reports** in the header (the address ends in `#/reports`). Pick how many weeks to show: 4, 8 (default), 12, or all saved weeks. Everything is computed from the saved data, so it never calls Jira.
+Choose **Reports** in the header (the address ends in `#/reports`). Pick how many weeks to show: 1, 2, 4, 8 (default), 12, all saved weeks, or **Custom number of weeks** at the bottom of the menu, which opens a box for any whole number from 1 up to the weeks saved (about 50). A number that is too big is held to the most weeks saved. Choices that need more weeks than are saved are greyed out. Everything is computed from the saved data, so it never calls Jira.
 
 - **Opened and closed by week:** a bar chart and a table. Opened counts by created date, closed by resolved date. Weeks run Sunday to Saturday. The week in progress is marked "to date" and ends at the last refresh.
 - **Open work by status:** a donut of open tickets right now. It is a snapshot and ignores the weeks shown.
@@ -167,7 +173,7 @@ If a key is ever committed, treat it as exposed: revoke it at https://id.atlassi
 npm test
 ```
 
-152 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster page's save and search endpoints, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
+174 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster page's save and search endpoints, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
 
 ## Packages
 

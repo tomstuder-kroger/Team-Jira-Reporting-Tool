@@ -12,7 +12,7 @@ Owner: the product design lead. Audience: design leadership. **Localhost only, b
 
 ```bash
 npm start                                   # dev server and refresh endpoint, http://127.0.0.1:5173
-npm test                                    # vitest, runs once (152 tests)
+npm test                                    # vitest, runs once (174 tests)
 npm run build                               # production build to dist/
 npm run data:jira                           # same refresh as the header button, from the terminal
 node --env-file=.env scripts/jira-check.mjs # checks the credentials, prints status codes only
@@ -69,7 +69,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 - **Roster:** the names in `config.roster`, by Jira display name.
 - **Counts for a designer:** assigned to them, or named in the Pair field. A developer's ticket reaches a designer only through Pair.
 - **Window:** `{ start, end }`, start inclusive, end exclusive, and **end never passes the last pull**. Rolling presets (last 7, 14, 30 days) count back from the pull. Calendar and fiscal presets (this/last week, this/last period, this/last quarter, fiscal year to date) are worked out from **today**, via `useToday()`, so they roll over by themselves; their end is held back to the pull, and a window that starts after the pull is disabled with "Refresh from Jira" and the page shows a stale-data note. Custom ranges take a start and an end day. `resolveWindow(range, pull, historyStart, today)` in `src/lib/windows.js`.
-- **Compare:** `range.compare === 'previous'` adds `prev`, `change` and `good` to each KPI tile. Previous = the fiscal period or quarter before a "last" preset (`prev` field), else the same length ending where this window starts. Unavailable (with a reason) if it reaches before `historyStart`.
+- **Compare:** `range.compare` is `'off'`, `'previous'` or the id of any Date range preset. It adds `prev`, `change` and `good` to each KPI tile. `'previous'` = the fiscal period or quarter before a "last" preset (`prev` field), else the same length ending where this window starts. A preset comparison is unavailable (with a reason, in `win.compareChoices`) if it is the viewed range, overlaps it, reaches before `historyStart`, or starts after the pull. `win.compare` carries `days`, `mainDays` and `sameLength`; the Dashboard shows a note when the lengths differ. No same-days-in option yet (a deliberate MVP cut). An unusable saved comparison quietly becomes no comparison.
 - **Counts in a window:** a ticket that was **created, resolved, or changed status** in it (`hasActivity` in `src/lib/history.js`). Comment-only edits (`u`) are deliberately not activity. **Statuses are shown as at the end of the window**, replayed from `h` with `statusAt`/`statusAtEnd`; a window ending at the pull uses the current status. A ticket is open at the end if it existed and was not yet resolved. Tickets follow their **current** assignee and Pair, so a reassignment moves past activity to the new owner (stated in the page footer).
 - **Active designer:** at least one counted ticket. **No activity:** none, even if they have open tickets; the table says how many.
 - **Tiles:** active; no activity; closed (moved and in a Closed status); in progress and PM review (moved tickets currently in that bucket); blocked. **Blocked is every ticket Blocked at the end of the window** (for a window ending now, today's blocked list), with days blocked as of that moment. A ticket shared by two designers counts once in the tiles and appears on both cards.
@@ -89,7 +89,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 ## Tests
 
-152 tests in nine files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `server/roster.test.js` (roster validation and save, backup, endpoint guards, user search leaks no email or ID), `src/lib/designers.test.js` (last-name sort, name filter, saved layout), `src/components/DesignerCard.test.jsx` (hidden card keeps name, counts and badges), `src/lib/history.test.js` (status replay, activity rule, open at end), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
+174 tests in nine files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution, compare with a preset), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `server/roster.test.js` (roster validation and save, backup, endpoint guards, user search leaks no email or ID), `src/lib/designers.test.js` (last-name sort, name filter, saved layout), `src/components/DesignerCard.test.jsx` (hidden card keeps name, counts and badges), `src/lib/history.test.js` (status replay, activity rule, open at end), `src/lib/blocked.test.js` (blocked spells and weekly blocked counts), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split, the weeks-shown choice incl. custom; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
 
 ## Stale pieces
 
@@ -115,6 +115,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 ## Reports page definitions
 
 - **Opened:** created date. **Closed:** resolved date (latest, so a reopened ticket moves). Both for roster tickets (assignee or Pair). A ticket opened and closed in the same week counts in both.
+- **Weeks shown:** 1, 2, 4, 8, 12, all, or custom (a whole number, kept between 1 and the complete weeks saved). Saved in `dar.weeks` as `{ choice, custom }`; the older plain-text value still loads. The week in progress is always added.
 - **Weeks:** Sunday to Saturday, local midnights. The first week is dropped if it starts before `historyStart`. The week in progress ends at the pull and is excluded from velocity.
 - **Velocity:** tickets closed, never points. Average of the last four complete weeks, best, lowest, median days created to resolved.
 - **Open by status:** snapshot at the pull, ignores the weeks selector. **Closed by designer:** assigned plus paired, shown separately.

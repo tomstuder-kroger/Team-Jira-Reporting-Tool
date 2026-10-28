@@ -13,6 +13,8 @@ import { useToday } from '@/lib/today'
 import { filterDesigners, loadView, saveView, sortDesigners } from '@/lib/designers'
 import { cn } from '@/lib/utils'
 
+const plural = (n) => `${n} ${n === 1 ? 'day' : 'days'}`
+
 const SectionTitle = ({ children }) => (
   <h2 className="border-b-2 border-primary pb-2 font-heading text-xs font-bold uppercase tracking-widest text-muted-foreground">{children}</h2>
 )
@@ -44,8 +46,8 @@ export default function Dashboard({ data }) {
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           <RangeControls win={win} range={range} onChange={changeRange} />
           <dl className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-xs tabular-nums">
-            <dt className="text-muted-foreground">Range</dt><dd>{windowLabel(win)}</dd>
-            {win.compare?.ok && (<><dt className="text-muted-foreground">Compared with</dt><dd>{win.compare.label}</dd></>)}
+            <dt className="text-muted-foreground">Range</dt><dd>{windowLabel(win)}{win.compare?.ok ? ` (${plural(win.days)})` : ''}</dd>
+            {win.compare?.ok && (<><dt className="text-muted-foreground">Compared with</dt><dd>{win.compare.label} ({plural(win.compare.days)})</dd></>)}
             <dt className="text-muted-foreground">Data pulled</dt><dd>{pulledLabel(data.meta)}</dd>
             <dt className="text-muted-foreground">Designers tracked</dt><dd>{report.rows.length}</dd>
           </dl>
@@ -61,6 +63,11 @@ export default function Dashboard({ data }) {
       )}
 
       <KpiStrip kpis={report.kpis} />
+      {win.compare?.ok && !win.compare.sameLength && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          The two ranges differ in length: {plural(win.days)} against {plural(win.compare.days)}. Totals such as tickets closed are not like for like.
+        </p>
+      )}
       <BlockerAlert blocked={report.blocked} />
 
       <DesignerToolbar

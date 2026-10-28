@@ -11,11 +11,16 @@ const GROUPS = [
   ['Fiscal', ['period', 'lastperiod', 'quarter', 'lastquarter', 'fytd']],
 ]
 
+// A few words for the greyed-out menu entries; the full reason is in the tooltip.
+const whyShort = (reason = '') =>
+  reason.startsWith('This is') ? 'viewing now' : reason.startsWith('Overlaps') ? 'overlaps' : reason.startsWith('This range starts after') ? 'no data yet' : 'not enough saved data'
+
 export default function RangeControls({ win, range, onChange }) {
   const custom = win.id === 'custom'
   const keep = { compare: range.compare ?? 'off' }
   const byId = Object.fromEntries(win.presets.map((p) => [p.id, p]))
   const opt = win.compareOption
+  const choiceById = Object.fromEntries(win.compareChoices.map((c) => [c.id, c]))
 
   return (
     <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
@@ -81,15 +86,26 @@ export default function RangeControls({ win, range, onChange }) {
         <Label htmlFor="compare-select">Compare with</Label>
         <select
           id="compare-select"
-          className={cn(FIELD, 'min-w-44')}
-          value={opt.ok ? (range.compare ?? 'off') : 'off'}
+          className={cn(FIELD, 'min-w-48')}
+          value={win.compare?.ok ? range.compare : 'off'}
           onChange={(e) => onChange({ ...range, compare: e.target.value })}
-          title={opt.ok ? undefined : opt.reason}
         >
           <option value="off">Nothing</option>
-          <option value="previous" disabled={!opt.ok}>
-            {win.prev === 'period' ? 'Previous period' : win.prev === 'quarter' ? 'Previous quarter' : 'Previous range'}{opt.ok ? '' : ' (not enough saved data)'}
+          <option value="previous" disabled={!opt.ok} title={opt.ok ? undefined : opt.reason}>
+            {win.prev === 'period' ? 'Previous period' : win.prev === 'quarter' ? 'Previous quarter' : 'Previous range (same length)'}{opt.ok ? '' : ' (not enough saved data)'}
           </option>
+          {GROUPS.map(([label, ids]) => {
+            const items = ids.map((id) => choiceById[id]).filter(Boolean)
+            return items.length === 0 ? null : (
+              <optgroup key={label} label={label}>
+                {items.map((c) => (
+                  <option key={c.id} value={c.id} disabled={!c.ok} title={c.reason}>
+                    {byId[c.id].label}{c.ok ? '' : ` (${whyShort(c.reason)})`}
+                  </option>
+                ))}
+              </optgroup>
+            )
+          })}
         </select>
       </div>
     </div>

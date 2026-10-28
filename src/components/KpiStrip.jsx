@@ -11,7 +11,7 @@ function Change({ k }) {
   const worse = k.good && k.change !== 0 && !better
   return (
     <small className={cn('text-xs tabular-nums', better ? 'text-success' : worse ? 'text-destructive' : 'text-muted-foreground')}>
-      {k.change === 0 ? 'no change' : `${sign}${Math.abs(k.change)}`} vs {k.prev} before
+      {k.change === 0 ? 'no change' : `${sign}${Math.abs(k.change)}`} vs {k.prev} compared
     </small>
   )
 }

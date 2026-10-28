@@ -8,7 +8,7 @@ const FIELD =
 
 export default function DesignerToolbar({ view, onView, filter, onFilter, onExpandAll, onCollapseAll }) {
   return (
-    <div className="flex flex-wrap items-end gap-x-4 gap-y-3" role="group" aria-label="Designer cards: layout, sort and filter">
+    <div className="flex flex-wrap items-end justify-end gap-x-4 gap-y-3" role="group" aria-label="Designer cards: layout, sort and filter">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="designer-filter">Filter by name</Label>
         <input

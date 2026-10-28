@@ -85,8 +85,34 @@ function comparisonFor(win, historyStart) {
     if (isMidnight(win.start)) start = startOfDay(new Date(start.getTime() + 12 * 3600e3)) // absorb a daylight-saving hour
   }
   if (start < historyStart) return { ok: false, reason: `The saved data only goes back to ${fmtFull(historyStart)}.` }
-  const cmp = { ok: true, start, end }
-  return { ...cmp, label: windowLabel(cmp), within: `from ${fmtShort(start)} to ${fmtShort(lastDay(cmp))}` }
+  return finishComparison(start, end, win)
+}
+
+const lengthMs = (w) => w.end.getTime() - w.start.getTime()
+const dayCount = (w) => Math.max(1, Math.round(lengthMs(w) / DAY_MS))
+
+/** Adds the label, the day counts and whether the two ranges are the same length (within a daylight-saving hour or two). */
+function finishComparison(start, end, win, extra = {}) {
+  const cmp = { start, end }
+  return {
+    ok: true,
+    ...extra,
+    start,
+    end,
+    label: windowLabel(cmp),
+    within: `from ${fmtShort(start)} to ${fmtShort(lastDay(cmp))}`,
+    days: dayCount(cmp),
+    mainDays: dayCount(win),
+    sameLength: Math.abs(lengthMs(cmp) - lengthMs(win)) < 2 * 3600e3,
+  }
+}
+
+/** Compare with a range chosen from the same presets as Date range. Unavailable, with a reason, if it cannot be used. */
+function presetComparison(preset, win) {
+  if (preset.id === win.id) return { ok: false, id: preset.id, reason: 'This is the range you are viewing.' }
+  if (preset.disabled) return { ok: false, id: preset.id, reason: preset.reason }
+  if (preset.start < win.end && preset.end > win.start) return { ok: false, id: preset.id, reason: 'Overlaps the date range you are viewing.' }
+  return finishComparison(preset.start, preset.end, win, { id: preset.id })
 }
 
 /**
@@ -118,7 +144,12 @@ export function resolveWindow(range, pull, historyStart, today = pull) {
     chosen = presets.find((p) => p.id === range?.id && !p.disabled) ?? presets[0]
   }
 
-  const compare = range?.compare === 'previous' ? comparisonFor(chosen, historyStart) : null
+  // range.compare: 'off', 'previous' (automatic), or the id of any preset in the Date range menu.
+  const choices = presets.map((p) => presetComparison(p, chosen))
+  const previous = comparisonFor(chosen, historyStart)
+  let compare = null
+  if (range?.compare === 'previous') compare = previous
+  else if (range?.compare && range.compare !== 'off') compare = choices.find((c) => c.id === range.compare) ?? null
   return {
     ...chosen,
     note,
@@ -127,8 +158,10 @@ export function resolveWindow(range, pull, historyStart, today = pull) {
     untilDay: toIsoDay(lastDay(chosen)),
     minDay: toIsoDay(min),
     maxDay: toIsoDay(max),
-    compareOption: comparisonFor(chosen, historyStart),
+    compareOption: previous,
+    compareChoices: choices,
     compare,
+    days: dayCount(chosen),
     // The pull is older than today: newer activity is not in the saved data yet.
     stale: startOfDay(today) > startOfDay(pull),
   }
@@ -147,7 +180,7 @@ export function loadRange() {
         id: v.id,
         since: typeof v.since === 'string' ? v.since : null,
         until: typeof v.until === 'string' ? v.until : null,
-        compare: v.compare === 'previous' ? 'previous' : 'off',
+        compare: typeof v.compare === 'string' && /^[a-z0-9]{1,20}$/.test(v.compare) ? v.compare : 'off',
       }
     }
   } catch { /* storage unavailable or corrupt */ }

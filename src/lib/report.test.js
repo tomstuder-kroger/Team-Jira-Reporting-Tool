@@ -213,6 +213,102 @@ describe('comparing two ranges', () => {
   })
 })
 
+describe('comparing with a range chosen from the Date range menu', () => {
+  const TODAY = new Date(2026, 9, 28, 13, 0) // Wed Oct 28 2026: P10 (Oct 11 to Nov 7), Q3
+  const pull = new Date(2026, 9, 28, 13, 0)
+  const early = new Date(2026, 0, 1)
+  const res = (range) => resolveWindow(range, pull, early, TODAY)
+
+  it('offers every Date range preset as a comparison, in the same order', () => {
+    const w = res({ id: 'period', compare: 'off' })
+    expect(w.compareChoices.map((c) => c.id)).toEqual(w.presets.map((p) => p.id))
+  })
+
+  it('compares This period with Last period, whole fiscal periods, and says the lengths differ', () => {
+    const w = res({ id: 'period', compare: 'lastperiod' })
+    expect(w.compare.ok).toBe(true)
+    expect(w.compare.label).toBe('Sep 13 to Oct 10, 2026')
+    expect([w.days, w.compare.days]).toEqual([18, 28]) // P10 so far (Oct 11 to Oct 28 noon) against all of P9
+    expect(w.compare.sameLength).toBe(false)
+  })
+
+  it('reports equal lengths as the same length', () => {
+    const w = res({ id: 'custom', since: '2026-10-05', until: '2026-10-11', compare: 'previous' })
+    expect([w.days, w.compare.days, w.compare.sameLength]).toEqual([7, 7, true])
+  })
+
+  it('treats a daylight-saving week as the same length as an ordinary week', () => {
+    // Nov 1 2026 is the fall clock change: the week of Nov 1 has 169 hours, the week of Oct 25 has 168.
+    const w = resolveWindow({ id: 'custom', since: '2026-11-01', until: '2026-11-07', compare: 'previous' }, new Date(2026, 10, 9, 12), early, new Date(2026, 10, 9, 12))
+    expect(w.compare.sameLength).toBe(true)
+  })
+
+  it('still offers the automatic previous range, unchanged', () => {
+    const w = res({ id: 'last7', compare: 'previous' })
+    expect(w.compare.ok).toBe(true)
+    expect(w.compare.sameLength).toBe(true)
+    expect(w.compareOption.ok).toBe(true)
+  })
+
+  it('greys out the range being viewed, and any range that overlaps it, with a reason', () => {
+    const w = res({ id: 'period' })
+    const by = (id) => w.compareChoices.find((c) => c.id === id)
+    expect(by('period')).toMatchObject({ ok: false, reason: 'This is the range you are viewing.' })
+    expect(by('quarter')).toMatchObject({ ok: false, reason: 'Overlaps the date range you are viewing.' }) // Q3 contains P10
+    expect(by('last30').ok).toBe(false) // the last 30 days overlap P10
+    expect(by('lastperiod').ok).toBe(true)
+  })
+
+  it('does not overlap when ranges only touch', () => {
+    const w = res({ id: 'lastperiod' }) // Sep 13 to Oct 10
+    expect(w.compareChoices.find((c) => c.id === 'period').ok).toBe(true) // P10 starts Oct 11, the day after
+  })
+
+  it('greys out a comparison that reaches before the saved data, or after the last refresh', () => {
+    const tight = resolveWindow({ id: 'period' }, pull, new Date(2026, 8, 1), TODAY) // data starts Sep 1
+    const q = tight.compareChoices.find((c) => c.id === 'lastquarter')
+    expect(q.ok).toBe(false)
+    expect(q.reason).toMatch(/saved data only goes back/)
+    const stale = resolveWindow({ id: 'last7' }, pull, early, new Date(2026, 10, 9, 9)) // today is Nov 9, data is from Oct 28
+    const p = stale.compareChoices.find((c) => c.id === 'period')
+    expect(p.ok).toBe(false)
+    expect(p.reason).toMatch(/Refresh from Jira/)
+  })
+
+  it('falls back to no comparison when a saved comparison is no longer usable', () => {
+    expect(res({ id: 'period', compare: 'period' }).compare?.ok).toBeFalsy() // cannot compare with itself
+    expect(res({ id: 'period', compare: 'quarter' }).compare?.ok).toBeFalsy() // overlaps
+    expect(res({ id: 'period', compare: 'nonsense' }).compare).toBeNull()
+    expect(res({ id: 'period', compare: 'off' }).compare).toBeNull()
+  })
+
+  it('adds the earlier value and change to the tiles using the chosen preset', () => {
+    const tickets = [
+      T('X-1', 'Closed', 'A, Ann', [], { c: at(9, 1), r: at(10, 21), h: [[at(10, 21), 'In Progress', 'Closed']] }), // in P10
+      T('X-2', 'Closed', 'A, Ann', [], { c: at(8, 1), r: at(9, 20), h: [[at(9, 20), 'In Progress', 'Closed']] }), // in P9
+      T('X-3', 'Closed', 'B, Bo', [], { c: at(8, 1), r: at(9, 25), h: [[at(9, 25), 'In Progress', 'Closed']] }), // in P9
+    ]
+    const r = buildReport({ version: 3, meta, tickets }, res({ id: 'period', compare: 'lastperiod' }), cfg)
+    const closed = r.kpis.find((k) => k.id === 'closed')
+    expect([closed.value, closed.prev, closed.change]).toEqual([1, 2, -1])
+  })
+
+  describe('the saved choice', () => {
+    afterEach(() => { delete globalThis.localStorage })
+    const store = (v) => { globalThis.localStorage = { getItem: () => v, setItem() {} } }
+    it('keeps a preset id as the comparison, and ignores junk', () => {
+      store(JSON.stringify({ id: 'period', compare: 'lastperiod' }))
+      expect(loadRange().compare).toBe('lastperiod')
+      store(JSON.stringify({ id: 'period', compare: 'previous' }))
+      expect(loadRange().compare).toBe('previous')
+      store(JSON.stringify({ id: 'period', compare: '<script>' }))
+      expect(loadRange().compare).toBe('off')
+      store(JSON.stringify({ id: 'period', compare: 7 }))
+      expect(loadRange().compare).toBe('off')
+    })
+  })
+})
+
 describe('notes and formatting', () => {
   it('writes a factual line from statuses only, naming the range', () => {
     const items = [{ k: 'X-1', s: 'Closed' }, { k: 'X-2', s: 'Closed' }, { k: 'X-3', s: 'PM Review' }, { k: 'X-4', s: 'Blocked' }]
