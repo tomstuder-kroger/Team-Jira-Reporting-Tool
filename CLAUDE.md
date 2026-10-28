@@ -12,7 +12,7 @@ Owner: the product design lead. Audience: design leadership. **Localhost only, b
 
 ```bash
 npm start                                   # dev server and refresh endpoint, http://127.0.0.1:5173
-npm test                                    # vitest, runs once (55 tests)
+npm test                                    # vitest, runs once (75 tests)
 npm run build                               # production build to dist/
 npm run data:jira                           # same refresh as the header button, from the terminal
 node --env-file=.env scripts/jira-check.mjs # checks the credentials, prints status codes only
@@ -49,7 +49,10 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 | `src/lib/report.js` | `buildReport(data, window)`: buckets, counts, active/quiet split, blockers, tiles, notes. |
 | `src/lib/windows.js` | Presets, custom start date, clamping, saved choice. |
 | `src/lib/fiscal.js` | Kroger fiscal calendar. |
-| `src/App.jsx` | Loads the data, refresh state, layout. |
+| `src/lib/weeks.js` | Reports page maths: Sunday-start weeks, opened and closed per week, velocity, open by status, closed by designer. Pure functions. |
+| `src/lib/route.js` | Hash route (`#/reports`, else dashboard). No router library. |
+| `src/App.jsx` | Loads the data, refresh state, shared alerts, switches page. |
+| `src/components/Dashboard.jsx`, `ReportsPage.jsx` | The two pages. Charts are plain SVG (`WeeklyChart`, `StatusDonut`, `ClosedByDesigner`) using theme tokens. |
 | `src/components/` | Header, RangeControls, KpiStrip, BlockerAlert, DesignerCard, QuietTable, StatusBadge, KdsNotice. |
 | `src/components/ui/` | shadcn-style primitives. `alert`, `badge`, `button`, `label` are copied from the sibling reference app. `card` is new. |
 | `src/index.css` | Theme tokens (oklch), copied from the sibling reference app. Light and `.dark`. |
@@ -78,7 +81,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 ## Tests
 
-55 tests in three files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
+75 tests in four files, all without network: `src/lib/report.test.js` (counting rules on fixed fixtures, sanity checks on the checked-in data, all 13 fiscal periods and the quarter edges, range resolution), `scripts/merge-lib.test.js`, `server/server.test.js` (Jira client, queries, refresh, endpoint with a mocked Jira), `src/lib/weeks.test.js` (week boundaries, opened/closed, velocity, status snapshot, designer split; two property checks on the real data that skip on a fresh clone). The checked-in-data tests assert properties (every roster member present, wider ranges never show fewer closed tickets) and not exact totals, so a normal refresh does not break them.
 
 ## Stale pieces
 
@@ -90,10 +93,18 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 - **Done:** theme, header and refresh button; live refresh from Jira; date ranges with fiscal presets; factual notes.
 - **Not seen by the owner yet:** the range dropdown and custom date picker. Layout at phone width and in dark mode has not been checked in a browser.
-- **Next: Wave 4, the reports page. Start in plan mode**, as the owner asked, and discuss before building. The owner wants a separate page (a header link) with pie and bar charts, a table of issues opened, closed and blocked over time, and some support for velocity.
-- **Later:** status history (blocked over time, days blocked, the date a ticket closed), roster settings page, per-designer drill-down. **Deferred on request:** scheduled digest.
+- **Wave 4 built (not yet seen by the owner in a browser):** Reports page with weekly opened/closed chart and table, open-by-status donut, closed by designer, and velocity from ticket counts.
+- **Next:** story-point velocity only once the owner names the field. **Later:** status history (blocked over time, days blocked, the date a ticket closed), roster settings page, per-designer drill-down. **Deferred on request:** scheduled digest.
 
-## Facts to use when planning Wave 4
+## Reports page definitions
+
+- **Opened:** created date. **Closed:** resolved date (latest, so a reopened ticket moves). Both for roster tickets (assignee or Pair). A ticket opened and closed in the same week counts in both.
+- **Weeks:** Sunday to Saturday, local midnights. The first week is dropped if it starts before `historyStart`. The week in progress ends at the pull and is excluded from velocity.
+- **Velocity:** tickets closed, never points. Average of the last four complete weeks, best, lowest, median days created to resolved.
+- **Open by status:** snapshot at the pull, ignores the weeks selector. **Closed by designer:** assigned plus paired, shown separately.
+- Bulk closes distort counts: one week in the real data had most of its closes on a single day. Don't "fix" it in code; the page footer and README say so.
+
+## Facts used when planning Wave 4
 
 - Jira returns created, updated and resolved times for every ticket, so opened and closed by week are available now.
 - Blocked over time needs each ticket's status history (the `changelog` expand). A sample of 100 tickets took about 3.5 seconds and showed 203 status changes, 6 into Blocked. Jira truncated the history on 13 of the 100, and those would need another call each; that was not tested.

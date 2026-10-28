@@ -1,6 +1,6 @@
 # Designer Activity Report
 
-A dashboard of what the product design team did in Jira: tickets closed, in progress, awaiting PM review and blocked, per designer, for a date range you choose, plus a list of designers with no activity.
+A dashboard of what the product design team did in Jira: tickets closed, in progress, awaiting PM review and blocked, per designer, for a date range you choose, plus a list of designers with no activity. A second page, **Reports**, shows tickets opened and closed by week, open work by status, closed by designer, and velocity.
 
 It runs on your machine at `http://127.0.0.1:5173` and is meant to stay there. The Jira key it uses never leaves this computer.
 
@@ -55,7 +55,7 @@ The **Date range** menu offers:
 
 Changing it is instant and doesn't call Jira. Your choice is remembered in the browser.
 
-- **Every range ends at the last refresh.** Jira keeps only each ticket's most recent update time, so a range that ended earlier would miss tickets touched since. For past periods, a reports page is planned.
+- **Every range ends at the last refresh.** Jira keeps only each ticket's most recent update time, so a range that ended earlier would miss tickets touched since. For past weeks, use the Reports page.
 - The page keeps about 4 months of history. A preset or start date that reaches back further than that is disabled or adjusted, and the page says so.
 - Fiscal presets work for FY2026 and FY2027 only, and **FY2027 is assumed, not checked** (see Limits).
 
@@ -82,6 +82,18 @@ Then choose Refresh from Jira. A new designer's tickets appear only after a refr
 - **Statuses** group into five badges: Closed; In Progress; PM Review (also Ready for Review and Ready for Test); Blocked; Open (also In Discovery and Selected).
 - The one-line note on each card is generated from ticket statuses, for example "Updated in the last 7 days: 7 closed, 1 in PM review. Blocked: ABC-123." It describes counts only, not causes or progress.
 
+## Reports page
+
+Choose **Reports** in the header (the address ends in `#/reports`). Pick how many weeks to show: 4, 8 (default), 12, or all saved weeks. Everything is computed from the saved data, so it never calls Jira.
+
+- **Opened and closed by week:** a bar chart and a table. Opened counts by created date, closed by resolved date. Weeks run Sunday to Saturday. The week in progress is marked "to date" and ends at the last refresh.
+- **Open work by status:** a donut of open tickets right now. It is a snapshot and ignores the weeks shown.
+- **Closed by designer:** tickets resolved in the weeks shown, split into assigned to them and paired.
+- **Velocity, without story points:** average tickets closed per week over the last four complete weeks, best and lowest week, and median days from created to resolved. The week in progress is left out of the average.
+- A ticket opened and closed in the same week counts in both columns. A reopened ticket uses its latest resolved date.
+- **Watch for bulk closes.** A cleanup that closes dozens of tickets at once raises that week's count and the average. The median time to close is steadier.
+- Not shown yet: blocked over time and days blocked (these need status history), and story-point velocity.
+
 ## What the page is made of
 
 - Header with the Kroger logo, **Refresh from Jira** and a light/dark toggle, styled after a sibling Kroger app's header.
@@ -95,8 +107,8 @@ config/report.config.json      roster, projects, status mapping, history length
 public/data/report.json        generated data the page loads (do not edit)
 server/                        refresh endpoint and Jira client (read-only), with tests
 scripts/                       merge step, CLI refresh, credential check
-src/lib/                       counting (report.js), ranges (windows.js), fiscal calendar (fiscal.js)
-src/components/                header, range menu, tiles, blocker alert, cards, table
+src/lib/                       counting (report.js), ranges (windows.js), fiscal calendar (fiscal.js), weekly counts (weeks.js), page route (route.js)
+src/components/                header, dashboard, reports page and its charts, range menu, tiles, cards, table
 .env                           your Jira key (git-ignored, you create it)
 CLAUDE.md                      background, rules, and Wave 4 notes for Claude Code
 ```
@@ -120,7 +132,7 @@ If a key is ever committed, treat it as exposed: revoke it at https://id.atlassi
 npm test
 ```
 
-55 tests, none needing the network: the counting rules, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
+75 tests, none needing the network: the counting rules, the weekly counts and velocity, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
 
 ## Packages
 
@@ -134,8 +146,7 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 
 ## What is not built yet
 
-- A **reports page** with charts, a table of tickets opened, closed and blocked over time, and velocity. Next up, to be planned first.
-- Status history, which gives blocked-over-time and the date a ticket closed.
+- Status history, which gives blocked over time, days blocked, and the date a ticket closed.
 - A settings page for the roster, and a drill-down per designer.
 - A scheduled digest (deferred on request).
 

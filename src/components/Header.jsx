@@ -9,6 +9,11 @@ const NAV_ACTION =
   'hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ' +
   'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent sm:px-4'
 
+const PAGES = [
+  { id: 'dashboard', label: 'Dashboard', href: '#/' },
+  { id: 'reports', label: 'Reports', href: '#/reports' },
+]
+
 function initialDark() {
   try {
     const saved = localStorage.getItem('theme')
@@ -17,7 +22,7 @@ function initialDark() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-export default function Header({ onRefresh, refreshing = false }) {
+export default function Header({ route = 'dashboard', onRefresh, refreshing = false }) {
   const [dark, setDark] = useState(initialDark)
 
   useEffect(() => {
@@ -32,6 +37,18 @@ export default function Header({ onRefresh, refreshing = false }) {
         <span className="truncate text-base font-normal leading-6 text-white sm:text-xl">PD Designer Activity Report</span>
       </div>
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        <nav aria-label="Pages" className="flex items-center gap-1 sm:gap-2">
+          {PAGES.map((p) => (
+            <a
+              key={p.id}
+              href={p.href}
+              className={`${NAV_ACTION} ${route === p.id ? 'underline decoration-2 underline-offset-8' : ''}`}
+              aria-current={route === p.id ? 'page' : undefined}
+            >
+              {p.label}
+            </a>
+          ))}
+        </nav>
         {onRefresh && (
           <button
             type="button"
