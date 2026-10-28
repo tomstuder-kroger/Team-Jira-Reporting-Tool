@@ -1,7 +1,6 @@
 import { ConfigError, JiraError, SetupError } from './errors.mjs'
 import { runRefresh } from './run.mjs'
-
-const LOCAL_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
+import { checkLocal, makeSend } from './guard.mjs'
 
 /**
  * Connect-style middleware for POST /api/refresh. Localhost only: it rejects other Host headers
@@ -15,24 +14,14 @@ export function createRefreshHandler({ root, env, fetchImpl, minIntervalMs = 150
     const url = new URL(req.url, 'http://localhost')
     if (url.pathname !== '/api/refresh') return next()
 
-    const send = (code, body) => {
-      res.statusCode = code
-      res.setHeader('Content-Type', 'application/json')
-      res.setHeader('Cache-Control', 'no-store')
-      res.end(JSON.stringify(body))
-    }
+    const send = makeSend(res)
 
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST')
       return send(405, { ok: false, error: 'Use POST.' })
     }
-    if (!LOCAL_HOST.test(req.headers.host ?? '')) return send(403, { ok: false, error: 'This service only answers on localhost.' })
-    const origin = req.headers.origin
-    if (origin) {
-      let same = false
-      try { same = new URL(origin).host === req.headers.host } catch { /* bad Origin header */ }
-      if (!same) return send(403, { ok: false, error: 'Request origin not allowed.' })
-    }
+    const denied = checkLocal(req)
+    if (denied) return send(denied.code, { ok: false, error: denied.error })
 
     try {
       if (inflight) return send(200, { ok: true, ...(await inflight), shared: true })

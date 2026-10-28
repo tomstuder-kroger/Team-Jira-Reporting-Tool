@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Header from '@/components/Header'
 import Dashboard from '@/components/Dashboard'
 import ReportsPage from '@/components/ReportsPage'
+import RosterPage from '@/components/RosterPage'
 import KdsNotice from '@/components/KdsNotice'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { usingExampleConfig } from '@/lib/config'
@@ -98,7 +99,9 @@ export default function App() {
           </Alert>
         )}
 
-        {data && (route === 'reports' ? <ReportsPage data={data} /> : <Dashboard data={data} />)}
+        {route === 'roster' && <RosterPage onRefresh={jira.refresh} refreshing={jira.busy} />}
+        {data && route === 'reports' && <ReportsPage data={data} />}
+        {data && route === 'dashboard' && <Dashboard data={data} />}
       </main>
     </div>
   )

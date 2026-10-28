@@ -25,13 +25,13 @@ export function createJiraClient({ email, token, cloudId, fetchImpl = globalThis
   const auth = 'Basic ' + Buffer.from(`${email}:${token}`).toString('base64')
   const base = `https://api.atlassian.com/ex/jira/${cloudId}`
 
-  async function post(path, payload) {
+  async function request(method, path, payload) {
     let res
     try {
       res = await fetchImpl(base + path, {
-        method: 'POST',
-        headers: { Authorization: auth, Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        method,
+        headers: { Authorization: auth, Accept: 'application/json', ...(payload ? { 'Content-Type': 'application/json' } : {}) },
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
         signal: AbortSignal.timeout(timeoutMs),
       })
     } catch (e) {
@@ -46,6 +46,7 @@ export function createJiraClient({ email, token, cloudId, fetchImpl = globalThis
     if (!body || typeof body !== 'object') throw new JiraError('Jira returned a response that was not JSON.', res.status)
     return body
   }
+  const post = (path, payload) => request('POST', path, payload)
 
   /** Every issue matching the JQL, following nextPageToken. Fails rather than returning a partial list. */
   async function searchAll(jql, fields) {
@@ -109,5 +110,18 @@ export function createJiraClient({ email, token, cloudId, fetchImpl = globalThis
     return out
   }
 
-  return { searchAll, statusHistory }
+  /**
+   * People whose Jira display name matches the text. Read-only. Returns display names only, for
+   * active, real accounts: emails, account IDs and avatars are dropped here and never leave the server.
+   */
+  async function searchUsers(query) {
+    const body = await request('GET', `/rest/api/3/user/search?query=${encodeURIComponent(query)}&maxResults=10`)
+    const people = Array.isArray(body) ? body : body.values
+    if (!Array.isArray(people)) throw new JiraError('Jira returned a user search result this app does not understand.')
+    return people
+      .filter((u) => u && u.active === true && u.accountType === 'atlassian' && typeof u.displayName === 'string' && u.displayName.trim())
+      .map((u) => ({ displayName: u.displayName.trim() }))
+  }
+
+  return { searchAll, statusHistory, searchUsers }
 }
