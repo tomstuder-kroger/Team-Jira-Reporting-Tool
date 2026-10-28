@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-A dashboard of Jira activity for the 12-person product design team. For a chosen date range it shows, per designer, the tickets they were assigned or paired on that moved, plus summary tiles, open blockers, and a table of designers with no activity. The look follows `capacity-planning-app`: Kroger header and logo, DM Sans and Nunito, shadcn tokens, and a KDS message (`kds-message` from MX Web) for the refresh notice.
+A dashboard of Jira activity for the product design team. Three pages (hash routes): **Dashboard** (per-designer cards for a chosen date range, summary tiles, open blockers, a table of designers with no activity), **Reports** (opened/closed by week, blocked over time, open by status, closed by designer, velocity) and **Roster** (add/remove tracked designers by searching Jira). The look follows `capacity-planning-app`: Kroger header and logo, DM Sans and Nunito, shadcn tokens, and a KDS message (`kds-message` from MX Web) for the refresh notice.
 
 Owner: the product design lead. Audience: design leadership. **Localhost only, by decision.** The Jira key lives in `.env` on this machine and the app is not to be hosted or shared.
 
@@ -31,7 +31,7 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 - `report.json` (version 3) holds **timestamps and status changes only**: each ticket has `c` created, `u` updated, `r` resolved (null while open), and `h`, its status changes `[timestamp, from, to]` oldest first. About a year of history (`historyDays`, 366, the maximum). About 350 KB for roughly 700 tickets; a refresh took about 6 seconds when checked.
 - **Which tickets count in the range is decided in the browser.** Changing the range never calls Jira. The page rejects any file whose `version` is not 3 and tells the user to refresh.
-- The server code is plain modules in `server/` so it is unit tested with a mocked Jira. `vite.config.js` mounts it with `configureServer`; `.env` is read once when the dev server starts, so **restart `npm start` after editing `.env`**.
+- The server code is plain modules in `server/` so it is unit tested with a mocked Jira. `vite.config.js` mounts it with `configureServer`; `.env` is read once when the dev server starts, so **restart `npm start` after editing `.env`**. The roster endpoints rewrite `config/report.config.json` (roster key only); Vite reloads the page when it changes.
 - Credentials never reach the browser. The endpoint's responses and errors never contain them (tested).
 
 ## Files that matter
@@ -99,14 +99,10 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 
 ## Status
 
-- **Done:** theme, header and refresh button; live refresh from Jira; factual notes; Waves 4 and 5 (Reports, status history, Roster page).
-- **Wave 6 built (date range rework; not yet seen by the owner in a browser):** presets for week, period, quarter and fiscal year (this and last), custom start and end, compare with an earlier range, today-based fiscal lookups, status-change activity rule, statuses as at the end of the range, 366 days of history.
-- **Dashboard cards (not yet seen by the owner in a browser):** grid or list layout, per-card show/hide that keeps name, counts and badges, sort by last name, filter by name. Filter and sort affect only the cards and the no-activity table, never the tiles or blockers. Hidden cards are not remembered across visits; layout and sort are.
-- **Not seen by the owner yet:** the range dropdown, custom dates, compare and the card controls. Layout at phone width and in dark mode has not been checked in a browser.
-- **Wave 4 built (not yet seen by the owner in a browser):** Reports page with weekly opened/closed chart and table, open-by-status donut, closed by designer, and velocity from ticket counts.
-- **Wave 5a built (status history; not yet seen by the owner in a browser):** blocked over time on Reports, days blocked on the Dashboard.
-- **Wave 5b built (roster page; not yet seen by the owner in a browser):** add by Jira search, remove, save to the config file.
-- **Next:** Story-point velocity only once the owner names the field. **Later:** per-designer drill-down. **Deferred on request:** scheduled digest.
+- **Built, in this order:** theme and header; live refresh from Jira; date ranges and factual notes; Wave 4 Reports page; Wave 5a status history (blocked over time, days blocked); Wave 5b Roster page; Wave 6 date range rework (this/last week, period, quarter, fiscal year to date, custom start and end, compare, status-change activity rule, statuses as at the end of the range, 366 days of history); Dashboard card controls (grid/list, show/hide that keeps name, counts and badges, last-name sort, name filter). Filter and sort affect only the cards and the no-activity table, never the tiles or blockers. Hidden cards are not remembered across visits; layout and sort are.
+- **Seen by the owner:** the owner said everything looks good for now. Claude has never looked at a browser, and tests cover the numbers, not the visuals; phone width, dark mode and every range have not been checked systematically.
+- **Next:** story-point velocity, only once the owner names the field. **Later:** per-designer drill-down, time spent in each status. **Deferred on request:** scheduled digest.
+- **Chores still open:** rewrite or delete the out-of-date skill (see Stale pieces); spot-check one past week's closed count against Jira; confirm FY2027 dates; find out whether the Jira key is read-only.
 
 ## Blocked definitions
 
@@ -124,14 +120,13 @@ page --fetch--> report.json --> src/lib/windows.js (the range) + src/lib/report.
 - **Open by status:** snapshot at the pull, ignores the weeks selector. **Closed by designer:** assigned plus paired, shown separately.
 - Bulk closes distort counts: one week in the real data had most of its closes on a single day. Don't "fix" it in code; the page footer and README say so.
 
-## Facts used when planning Wave 4
+## Facts worth keeping
 
-- Jira returns created, updated and resolved times for every ticket, so opened and closed by week are available now.
-- Blocked over time needs each ticket's status history (the `changelog` expand). A sample of 100 tickets took about 3.5 seconds and showed 203 status changes, 6 into Blocked. Jira truncated the history on 13 of the 100, and those would need another call each; that was not tested.
 - A ticket's resolved date can change if it is reopened and closed again. How often that happens was not measured.
 - **Velocity:** the team does not use story points or T-shirt sizes consistently, and the owner cannot require it yet. A Story Points field was set on about 74% of tickets closed in 90 days, but several similarly named fields exist and it is not known which the team uses (the field IDs are in the git-ignored `CLAUDE.local.md`). Tickets closed per week is the dependable measure; points should be optional and shown with their coverage.
-- Charts: shadcn's chart component needs `recharts`, which is not installed, and package installs have been unreliable here. The reference app has no charting library. Plain SVG with the existing color tokens is the likely route.
-- Weeks run Sunday to Saturday because FY2026 starts on a Sunday.
+- **Charts** are plain SVG with the theme colors. shadcn's chart component needs `recharts`, which is not installed, and package installs have been unreliable here.
+- **Status history** comes from Jira's bulk history endpoint, not `expand=changelog`, which truncates long histories.
+- Weeks run Sunday to Saturday because the fiscal calendar does.
 
 ## Open questions
 
@@ -156,5 +151,5 @@ Registered with `claude mcp add --transport http atlassian https://mcp.atlassian
 - `gh api` and `gh repo clone` work for the reference repo.
 - JQL on this site accepts the Pair field as `cf[<id>]` and by display name. Search results page at 100; always follow `nextPageToken`.
 - Names with `(NonEmp)` are real Jira display names; keep them exactly as in config. Titles are whitespace-normalised on refresh.
-- The refresh gives up with a plain error past 2,000 tickets, on any failed page (it never saves a partial list), and on an empty answer (it keeps the old file).
+- The refresh gives up with a plain error past 2,000 tickets (the 366-day history was about 700 when checked), on any failed page (it never saves a partial list), and on an empty answer (it keeps the old file).
 - A KDS message removes itself from the DOM when closed. `KdsNotice` is keyed per notice so React replaces the whole wrapper.

@@ -1,6 +1,12 @@
 # Designer Activity Report
 
-A dashboard of what the product design team did in Jira: tickets closed, in progress, awaiting PM review and blocked, per designer, for a date range you choose, plus a list of designers with no activity. A second page, **Reports**, shows tickets opened and closed by week, open work by status, closed by designer, and velocity.
+A dashboard of what the product design team did in Jira: tickets closed, in progress, awaiting PM review and blocked, per designer, for a date range you choose (including past periods and a comparison with an earlier one), plus a list of designers with no activity.
+
+There are three pages, linked in the header:
+
+- **Dashboard:** summary tiles, active blockers, and one card per designer (grid or list, sortable, filterable, each card can be hidden down to its counts).
+- **Reports:** tickets opened and closed by week, blocked over time, open work by status, closed by designer, and velocity.
+- **Roster:** add or remove the designers who are tracked, by searching Jira.
 
 It runs on your machine at `http://127.0.0.1:5173` and is meant to stay there. The Jira key it uses never leaves this computer.
 
@@ -129,14 +135,17 @@ Choose **Reports** in the header (the address ends in `#/reports`). Pick how man
 ## Files
 
 ```
-config/report.config.json      roster, projects, status mapping, history length
-public/data/report.json        generated data the page loads (do not edit)
-server/                        refresh and roster endpoints, Jira client (read-only), with tests
+config/report.config.json      roster, projects, status mapping, history length (git-ignored; see below)
+public/data/report.json        generated data the page loads (git-ignored, do not edit)
+server/                        refresh and roster endpoints, read-only Jira client, with tests
 scripts/                       merge step, CLI refresh, credential check
-src/lib/                       counting (report.js), ranges (windows.js), fiscal calendar (fiscal.js), weekly counts (weeks.js), blocked spells (blocked.js), page route (route.js)
-src/components/                header, dashboard and its card toolbar, reports page and its charts, range menu, tiles, cards, table
+src/lib/                       counting (report.js), date ranges (windows.js), fiscal calendar (fiscal.js),
+                               status replay (history.js), weekly counts (weeks.js), blocked spells (blocked.js),
+                               card sort and filter (designers.js), page route (route.js), today's date (today.js)
+src/components/                header, dashboard and its card toolbar, reports page and its charts,
+                               roster page, range menu, tiles, cards, table
 .env                           your Jira key (git-ignored, you create it)
-CLAUDE.md                      background, rules, and Wave 4 notes for Claude Code
+CLAUDE.md                      background, rules, definitions and status for Claude Code
 ```
 
 ## Keeping it safe to publish
@@ -174,6 +183,7 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 
 - Time spent in each status (for example days in PM review).
 - A drill-down per designer.
+- Story-point velocity, once the team settles on one story-point field.
 - A scheduled digest (deferred on request).
 
 ## Limits to know
@@ -183,12 +193,10 @@ Earlier the data came through Claude Code and the Atlassian MCP, using the `/ref
 - **Velocity can't rest on story points yet.** The team doesn't use them consistently. Tickets closed per week is the dependable measure.
 - **FY2027 dates are assumed**, not checked against a printed calendar. FY2026 was checked. After FY2027 the fiscal presets disappear.
 - The Jira key may not be read-only (see setup).
-- Layout at phone width and in dark mode hasn't been checked in a browser.
+- Phone width and dark mode have not been checked systematically on every page. The tests cover the numbers, not how the pages look.
 
-## After upgrading to the status-history version
+## After upgrading from an older version
 
-The saved file format changed (version 3). The page shows "report.json is in an older format" until you choose **Refresh from Jira** once. The refresh now makes a second read-only call for each ticket's status changes, and the file is about 60 KB larger. Statuses that appear in a ticket's history but are not listed in `statusBuckets` (for example old workflow steps) do not affect the blocked numbers, because only Blocked matters there.
+Choose **Refresh from Jira** once. The saved file format changed (version 3: it now holds each ticket's status changes), and until you refresh the page says "report.json is in an older format". The refresh makes two read-only calls (the ticket search, then the status history), pulls about a year of history (about 700 tickets), took about 6 seconds when checked, and saves a file of about 350 KB. Until you refresh, fiscal choices that reach back before the saved data are greyed out.
 
-## After the date range update (version 3 data, 366 days)
-
-Refresh from Jira once to bring in the longer history. Until then the saved file only reaches back 120 days, and fiscal choices that start earlier are greyed out. The refresh now returns about 700 tickets instead of about 400 and took about 6 seconds when checked, and the saved file is about 350 KB.
+Statuses that appear in a ticket's history but are not listed in `statusBuckets` (for example old workflow steps) do not affect the blocked numbers, because only Blocked matters there.
