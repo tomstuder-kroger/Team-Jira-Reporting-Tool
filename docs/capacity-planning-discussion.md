@@ -226,6 +226,38 @@ Things to settle:
 Recommendation: build the quarter figure first, since the plan already exists, and hold the weekly figure until D6 is answered.
 Answer:
 
+**D13. What should team members put on Jira work so we can see load by sprint, week or day?**
+
+Capacity compares supply (time a person has, which the Capacity page already does in weeks) with demand (work assigned, and when). The inputs below supply the demand side.
+
+| Input on Jira work | Best drill-down | Coverage today (counts) | Catch |
+|---|---|---|---|
+| Story points | Quarter and sprint, as relative load | 28% of open tickets; 70 of 179 closed values are 0 | Not time, so it cannot be compared to available hours without a conversion. |
+| T-shirt size (new field) | Quarter and sprint | None, new field | Low effort and coarse. The app maps S/M/L to hours or days in a setting you control. |
+| Hours or weeks (new field, or Jira's Original Estimate) | Sprint and week | None | Compares directly to supply, but people tend to enter false precision. |
+| Start and end dates | Week, day only approximately | Due date on 5 of 145 open tickets; target dates on 6 or 7 | Says when, not how big. Needs a size from another row. |
+| Sprint (already in Jira) | Sprint, and week through the sprint's dates | 62 of 145 open tickets | Free if the team already uses sprints. |
+
+Recommended: two levels.
+1. **Quarter, from the epic.** An estimate in weeks on the epic, or the % allocation already built. Least effort, gives the team view.
+2. **Week and sprint, from the story.** A t-shirt size (or hours) plus a sprint or start and end dates. The app spreads the size evenly across the dates or sprint, sums it per person per week against available hours (40 minus PTO and holidays), and answers "do you have capacity this week?" directly.
+3. **Skip a day-level view.** Spreading a story across days is guesswork and looks more precise than it is. A day can be shown as the week divided by five if needed.
+
+Rules to keep the numbers honest:
+- Show coverage next to every capacity number, for example "62% of open work is estimated". Unestimated work is a count, never a zero, so a person with no estimates does not look free.
+- Settle: does a pair share the estimate (default: the assignee carries it)? Does a ticket spanning two weeks count in both? Does done work leave the load when it closes?
+- Jira stays read-only. A Jira admin has to create any new field.
+
+Suggested path: a 2-week pilot with one team (t-shirt size plus sprint or dates on open stories), check how much gets filled in, then build in this order: read the new fields (data version 4), a week view with coverage, epics mapped to portfolios, capacity on each card.
+
+Questions for the collaborator:
+- T-shirt sizes or hours?
+- Who can create the field in Jira?
+- Is a week the finest drill-down needed?
+
+Recommendation: t-shirt size plus sprint or dates on stories, epic estimate for the quarter, week as the finest level, coverage always shown.
+Answer:
+
 ## 8. Risks and limits
 
 - **Adoption.** The plan is only as good as the dates and percents people enter. At 15% date coverage today, early views will look sparse. Plan for a clear "no dates" state and a way to chase gaps.
