@@ -163,7 +163,7 @@ export default function RosterPage({ onRefresh, refreshing }) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Add a designer</CardTitle>
+            <CardTitle>Add a team member</CardTitle>
             <CardDescription>searches Jira by name</CardDescription>
           </CardHeader>
           <div className="flex flex-col gap-1.5">
