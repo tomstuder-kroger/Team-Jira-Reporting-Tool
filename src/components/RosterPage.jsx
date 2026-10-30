@@ -118,14 +118,14 @@ export default function RosterPage({ onRefresh, refreshing }) {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-3.5">
         <Card>
           <CardHeader>
-            <CardTitle>Tracked designers ({working.length})</CardTitle>
+            <CardTitle>Tracked Team Members ({working.length})</CardTitle>
             <CardDescription>{dirty ? 'unsaved changes' : 'saved'}</CardDescription>
           </CardHeader>
 
           {saved === null && !loadError && <p className="text-sm text-muted-foreground">Loading…</p>}
 
           {saved && (
-            <ul className="flex flex-col divide-y" aria-label="Tracked designers">
+            <ul className="flex flex-col divide-y" aria-label="Tracked Team Members">
               {saved.map((name) => {
                 const gone = removed.has(name)
                 return (
