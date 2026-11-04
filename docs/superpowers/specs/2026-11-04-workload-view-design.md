@@ -18,7 +18,7 @@ The existing typed-in quarterly **Plan** stays exactly as it is. The Capacity pa
 |---|---|
 | Relationship to the quarterly plan | Add alongside. Plan is untouched. |
 | How work is sized | The Jira T-shirt size field. |
-| That field is almost empty (1 of 145 open tickets when checked 2026-11-04) | Build now. Show coverage on every figure. Unsized work is counted and listed, never treated as zero days. |
+| That field is almost empty (1 of 145 open tickets when checked 2026-11-04) | Build now. Show coverage on every figure. Unsized work is counted, listed and flagged, and adds 0 days to load (so it is never mistaken for free time). |
 | Pair work | Assignee only carries the full size. Paired people see it later as "paired on". |
 | A person's supply | Flat days per week (default 5 x 80% = 4), with per-person overrides **edited in the config file only; there is no screen for it in build 1**. Time off is not subtracted, and the page says so. |
 | Who is listed | Every roster member, so a person with nothing assigned shows at 0%. |
@@ -49,10 +49,10 @@ Existing row keys are `k t s a pair c u r h`, so none of these clash.
 **Config.** A new `workload` block, in the git-ignored real config, with fake IDs in `config/report.config.example.json`:
 - `sizeFieldId`, `rankFieldId` (each must match `customfield_\d+`)
 - `sizeDays`: `{ XS: 1.5, SM: 5, MED: 10, LG: 20, XL: 30 }` (every value a positive number)
-- `daysPerWeek` (5, a positive number up to 7), `focus` (0.8, from 0 to 1), and `overrides` keyed by roster name, for example `{ "Doe, Jamie": { focus: 0.4 } }` (every key must be on the roster)
+- `daysPerWeek` (5, a positive number **up to 5**, because capacity is spread over Monday to Friday and a work day cannot hold more than one day of effort), `focus` (0.8, from 0 to 1), and `overrides` keyed by roster name. An override may set `focus` or `daysPerWeek`, each under the same limits, for example `{ "Doe, Jamie": { focus: 0.4 } }`. Every override key must be on the roster.
 - `excludedTypes`: issue types that are containers and do not count (`Epic`, `Program Epic`)
 
-**The block is optional for refresh.** If it is absent, refresh still succeeds and writes `z` and `rk` as null; the Workload view then shows the "not configured" state in section 9. If it is present, it is validated. The server side validates in `assertConfig` (`server/queries.mjs`). The browser reads the same file through `src/lib/config.js`, so `config.workload` is available to the page.
+**The block is optional for refresh.** If it is absent, refresh still succeeds and writes `z` and `rk` as null; the Workload view then shows the "not configured" state in section 9. If it is present, it is validated. The server side validates in `assertConfig` (`server/queries.mjs`). The browser reads the same file through `src/lib/config.js`, so `config.workload` is available to the page. `assertConfig` only runs during a refresh, so a bad value edited into the file would otherwise reach the page unchecked. To avoid that, the workload validation is a pure function in a shared module (`src/lib/workloadConfig.js`) that both `assertConfig` and `workload.js` call; when it fails on the page, the Workload view shows "Not configured: <reason>" instead of wrong numbers.
 
 **Version handling.** The refresh writes `version: 4` (`DATA_VERSION` in `scripts/merge-lib.mjs`). The page gate in `src/App.jsx` (currently `version !== 3`) changes to **accept 3 or 4**, so the Dashboard, Reports and Plan keep working on an existing file until the owner next refreshes. Only the Workload view needs 4; on a version 3 file it shows "Refresh from Jira to load sizes and ranks". Tests that pin `version: 3` (`report.test.js`, `server.test.js`) keep passing for the accepted older version or change to 4 where they assert what refresh writes; `merge-lib.test.js` already uses the constant. The plan must list these.
 
@@ -77,7 +77,7 @@ Then:
 
 In-progress tickets count at full size, because Jira does not record how much is done.
 
-**One term, one denominator.** "Assigned work" means the days from tickets that pass rules 1 to 3 and are sized. **Countable tickets** means the tickets that pass rules 1 to 3, sized or not. Every coverage figure is *sized countable tickets of all countable tickets*, for example "1 of 145 sized". The Unsized tile counts countable tickets without a size. Tickets that fail rules 1 to 3 appear in no total.
+**One term, one denominator.** "Assigned work" means the days from tickets that pass rules 1 to 3 and are sized. **Countable tickets** means the tickets that pass rules 1 to 3, sized or not. Every coverage figure is *sized countable tickets of all countable tickets*, for example "1 of 145 sized". The Unsized tile counts countable tickets without a size, for everyone including people with zero capacity. Tickets that fail rules 1 to 3 appear in no total, with **one exception**: the "left out" count of open, non-excluded-type tickets that name a roster member in Pair but have no roster assignee. That count is shown on its own line and is never added to any other figure.
 
 ## 5. The maths (pure functions, tested)
 
@@ -94,7 +94,7 @@ weeks of work       = assigned work / weekly capacity
 
 Assigned work does not depend on the window. The window changes only what it is compared against.
 
-**Team:** assigned and capacity are summed over every listed person **who has capacity above zero**; team % is the ratio. **Over capacity** counts people with capacity above zero whose assigned work exceeds their window capacity. A person with zero capacity is dropped from both sums, so they cannot inflate the team %, and is shown as "No capacity set".
+**Team:** assigned and capacity are summed over every listed person **who has capacity above zero**; team % is the ratio. **Over capacity** counts people with capacity above zero whose assigned work exceeds their window capacity. A person with zero capacity is dropped from both sums, so they cannot inflate the team %, and is shown as "No capacity set". In the tile "Over capacity: N of M people", **M counts only people with capacity above zero**. Coverage and the Unsized tile include everyone.
 
 **Queue projection (per person).** The function takes `today` as an argument (normalised with `startOfDay`, as `windows.js` does) so tests can freeze it.
 1. Order: in-progress tickets first, then queued. Within a group, sort by rank string ascending (plain comparison); tickets with no rank go last; ties break by ticket key, so the order is stable.
@@ -104,7 +104,7 @@ Assigned work does not depend on the window. The window changes only what it is 
 5. **Queue clears:** the last projected finish. **Late:** the finish day is later than the due day (a day-to-day comparison, both as local days).
 6. **Unsized tickets have zero effort, so they are skipped:** no projected dates, no late flag.
 
-**Precision.** Work in integer tenths of a day (or compare with a small epsilon). Accumulating 0.8 per day in floating point drifts (4.8 then 0.2000000000000002) and flips day-boundary checks. The tests assert the Nov 9 and Nov 25 results exactly.
+**Precision.** Work in integer hundredths of a day, or compare with an epsilon of 1e-9. Tenths are not enough, because `focus` can be any value from 0 to 1 (0.35 gives 0.35 days per work day). Accumulating 0.8 per day in floating point drifts (4.8 then 0.2000000000000002) and flips day-boundary checks. The tests assert the Nov 9 and Nov 25 results exactly.
 
 **Zero and empty states, in this order of precedence:**
 1. Capacity is zero: "No capacity set", no projection.
@@ -147,7 +147,7 @@ The Capacity page header gets a **Plan | Workload** switch; the choice is rememb
   - *Unsized tickets:* count, with "not counted in load".
 - **Team members list.** One row per roster member: name and days per week, a bar (blue in progress, amber queued, a black tick at the window's capacity), the %, days, weeks of work, "clears <date>", and flags "N late" and "N unsized".
 - Rows are not clickable in this build, so no arrow is shown. The drill-down arrives in build 2.
-- **Coverage banner:** when fewer than half of countable open tickets are sized, a plain banner at the top says so ("Only 1 of 145 open tickets has a T-shirt size, so loads shown here are understated"). Every headline figure also shows its coverage ("1 of 145 sized").
+- **Coverage banner:** when there is at least one countable ticket and fewer than half of countable tickets are sized (hidden when there are none), a plain banner at the top says so ("Only 1 of 145 open tickets has a T-shirt size, so loads shown here are understated"). Every headline figure also shows its coverage ("1 of 145 sized").
 
 Charts and bars are plain SVG or CSS with theme tokens, like the Reports page. The page works at phone width (the list collapses to name, bar and percent) and in dark mode.
 
@@ -172,6 +172,8 @@ Charts and bars are plain SVG or CSS with theme tokens, like the Reports page. T
 |---|---|---|
 | `src/lib/workload.js` | Pure maths: sizes, counting rules, per-person load, queue projection, team totals, bands | `bucketOf` from `src/lib/report.js`, `parseIsoDay` and `startOfDay` from `windows.js`, `config.workload` |
 | `src/lib/workWindow.js` | Window presets, work-day counting, clamping, saved choice | `windows.js` helpers, `today.js` |
+| `src/lib/windows.js` | **Export `startOfDay` and `addDays`**, which are private consts today (lines 13 and 14), so `workload.js` and `workWindow.js` reuse them. No behaviour change. `parseIsoDay` is already exported. | |
+| `src/lib/workloadConfig.js` | Pure validation of the `workload` config block, shared by `assertConfig` and `workload.js` | |
 | `src/components/WorkloadPage.jsx` | The Workload view. Gets `data` as a prop; does **not** wait on the `/api/capacity` fetch or show its `loadError` | the two libs |
 | `src/components/WindowPicker.jsx` | Preset row, then the two-month range calendar with Apply (stage 1b) | `workWindow.js` |
 | `src/components/CapacityPage.jsx` | Gains the Plan / Workload switch only. Plan still loads and saves exactly as today | |
