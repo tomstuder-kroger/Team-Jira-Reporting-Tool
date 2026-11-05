@@ -15,10 +15,21 @@ export function toPoolRow(issue, cfg) {
     c: f.created ?? null,
     u: f.updated ?? null,
     r: f.resolutiondate ?? null,
+    y: f.issuetype?.name ?? null,
+    d: f.duedate ?? null,
+    // The size field is a Jira select ({ value: 'SM' }); tolerate a plain string too. Both are null without a workload block.
+    z: cfg.workload ? (typeof f[cfg.workload.sizeFieldId] === 'string' ? f[cfg.workload.sizeFieldId] : f[cfg.workload.sizeFieldId]?.value ?? null) : null,
+    rk: cfg.workload && typeof f[cfg.workload.rankFieldId] === 'string' ? f[cfg.workload.rankFieldId] : null,
+    // Start date, when the workload block names a field for it (a Jira date field returns YYYY-MM-DD).
+    sd: cfg.workload?.startFieldId && typeof f[cfg.workload.startFieldId] === 'string' ? f[cfg.workload.startFieldId] : null,
   }
 }
 
-const FIELDS = (cfg) => ['summary', 'status', 'assignee', cfg.pairFieldId, 'created', 'updated', 'resolutiondate']
+const FIELDS = (cfg) => [
+  'summary', 'status', 'assignee', cfg.pairFieldId, 'created', 'updated', 'resolutiondate', 'issuetype', 'duedate',
+  ...(cfg.workload ? [cfg.workload.sizeFieldId, cfg.workload.rankFieldId] : []),
+  ...(cfg.workload?.startFieldId ? [cfg.workload.startFieldId] : []),
+]
 
 /**
  * Query Jira and build the next report.json. Does not write anything.

@@ -1,7 +1,7 @@
 # Workload view (Capacity page), design
 
 **Date:** 2026-11-04
-**Status:** approved in conversation; written spec awaiting owner review.
+**Status:** approved in conversation; build 1 stage 1a is built. **Update 2026-11-04:** the owner retired the Plan view (so there is no Plan | Workload switch; Workload is the whole Capacity page), said sized work alone is not enough because tickets need start and end dates in Jira, and chose the fields **Start date** and **Due date**. The start date is now read into the data as `sd`; using the dates for load is a new build (see section 13). Sections 1, 2 and 8 below describe the original Plan | Workload design.
 **Scope of this spec:** build 1 only (team view). Builds 2 to 6 are listed under "Roadmap" and each gets its own spec.
 
 This file holds no real names, ticket keys, project keys, site names or field IDs. Real field IDs live in the git-ignored `config/report.config.json` and `CLAUDE.local.md`. Examples use fake values.
@@ -20,7 +20,7 @@ The existing typed-in quarterly **Plan** stays exactly as it is. The Capacity pa
 | How work is sized | The Jira T-shirt size field. |
 | That field is almost empty (1 of 145 open tickets when checked 2026-11-04) | Build now. Show coverage on every figure. Unsized work is counted, listed and flagged, and adds 0 days to load (so it is never mistaken for free time). |
 | Pair work | Assignee only carries the full size. Paired people see it later as "paired on". |
-| A person's supply | Flat days per week (default 5 x 80% = 4), with per-person overrides **edited in the config file only; there is no screen for it in build 1**. Time off is not subtracted, and the page says so. |
+| A person's supply | Flat days per week (default **updated 2026-11-04 to 40 hours a week, Monday to Friday: 5 days at 100% focus**; the first draft used 5 x 80% = 4), with per-person overrides **edited in the config file only; there is no screen for it in build 1**. Time off is not subtracted, and the page says so. |
 | Who is listed | Every roster member, so a person with nothing assigned shows at 0%. |
 | Color bands | The reference bands (section 6), labelled on the page. The Plan view keeps its own 90 and 100 thresholds. |
 | First build | Team view only. Drill-down, timeline, history, dated time off and story-point fallback follow as separate builds. |
@@ -49,7 +49,7 @@ Existing row keys are `k t s a pair c u r h`, so none of these clash.
 **Config.** A new `workload` block, in the git-ignored real config, with fake IDs in `config/report.config.example.json`:
 - `sizeFieldId`, `rankFieldId` (each must match `customfield_\d+`)
 - `sizeDays`: `{ XS: 1.5, SM: 5, MED: 10, LG: 20, XL: 30 }` (every value a positive number)
-- `daysPerWeek` (5, a positive number **up to 5**, because capacity is spread over Monday to Friday and a work day cannot hold more than one day of effort), `focus` (0.8, from 0 to 1), and `overrides` keyed by roster name. An override may set `focus` or `daysPerWeek`, each under the same limits, for example `{ "Doe, Jamie": { focus: 0.4 } }`. Every override key must be on the roster.
+- `daysPerWeek` (5, a positive number **up to 5**, because capacity is spread over Monday to Friday and a work day cannot hold more than one day of effort), `focus` (1, from 0 to 1; first draft 0.8), and `overrides` keyed by roster name. An override may set `focus` or `daysPerWeek`, each under the same limits, for example `{ "Doe, Jamie": { focus: 0.4 } }`. A name that is no longer on the roster is **ignored, not rejected**: removing someone on the Roster page must not make the next refresh fail because of a leftover override.
 - `excludedTypes`: issue types that are containers and do not count (`Epic`, `Program Epic`)
 
 **The block is optional for refresh.** If it is absent, refresh still succeeds and writes `z` and `rk` as null; the Workload view then shows the "not configured" state in section 9. If it is present, it is validated. The server side validates in `assertConfig` (`server/queries.mjs`). The browser reads the same file through `src/lib/config.js`, so `config.workload` is available to the page. `assertConfig` only runs during a refresh, so a bad value edited into the file would otherwise reach the page unchecked. To avoid that, the workload validation is a pure function in a shared module (`src/lib/workloadConfig.js`) that both `assertConfig` and `workload.js` call; when it fails on the page, the Workload view shows "Not configured: <reason>" instead of wrong numbers.
@@ -139,7 +139,7 @@ Theme tokens only, light and dark, no new palette. The page notes that Plan uses
 The Capacity page header gets a **Plan | Workload** switch; the choice is remembered in `localStorage` (`dar.capacityView`).
 
 **Workload view:**
-- A header row with the title, a one-line definition ("Open, assigned work sized by T-shirt, default 4 days a week per person. Time off is not included."), and the window button ("Next 4 weeks, 20 work days").
+- A header row with the title, a one-line definition ("Open, assigned work sized by T-shirt, default 5 days a week per person. Time off is not included."), and the window button ("Next 4 weeks, 20 work days").
 - **Four tiles:**
   - *Assigned work:* team % of capacity, days, in progress vs queued days.
   - *Capacity in the window:* % booked, days free.
@@ -211,7 +211,7 @@ Charts and bars are plain SVG or CSS with theme tokens, like the Reports page. T
 - `CLAUDE.md`: add the Workload definitions, the data version 4 shape, the new files and tests.
 - `docs/data-notes.md`: the stored-data table gains the four fields; the "fields requested" section changes from seven to the new list.
 - `config/report.config.example.json`: fake `workload` block.
-- Run the README leak check before any commit. `docs/capacity-calculations.md` is currently untracked and still contains the reference app's real-looking names and ticket keys; the rewrite must replace them with fake values (`Doe, Jamie`, `ABC-123`) before it is committed, and the leak check must cover it and `docs/data-notes.md`.
+- Run the README leak check before any commit. `docs/capacity-calculations.md` has been rewritten for this app with fake values only (`Doe, Jamie`, `ABC-123`); the leak check must cover it and `docs/data-notes.md` too.
 
 ## 13. Roadmap (separate specs, in this order)
 
@@ -219,6 +219,7 @@ Each build is reviewed before the next begins.
 
 | Build | What | Notes and dependencies |
 |---|---|---|
+| **Next: scheduled load** | Spread each ticket's size evenly over the work days from its start date to its due date, and show load per week against capacity, so over-booked weeks are visible. Tickets without both dates stay listed as unscheduled and keep the projected queue as a clearly labelled estimate. Coverage shown as "N of M scheduled". | Dates alone are ambiguous when a person has overlapping tickets, so size is still needed to split time. Needs its own design for: only a start or only a due date, a start in the past, a start after the due date, a ticket with no size but both dates. Only 6 of 145 open tickets had both dates when checked (2026-11-04). |
 | **2. Person drill-down page** | Click a row to see: tiles (assigned, capacity, queue clears, past due), a "Working on now" table (key, summary, status, size, projected dates, due), "Up next", an "Unsized issues" list, and "paired on" tickets. | Reuses build 1's maths. Enables the row arrow. Needs ticket summaries, which `report.json` already holds. Deep link by hash route. |
 | **3. Projected timeline chart** | A per-person timeline of queued tickets as bars across the window, shaded capacity window, due-date markers, late flags. | Uses the queue projection from build 1. Plain SVG with theme tokens. |
 | **4. History view** | A range entirely in the past shows delivered work (size of tickets resolved in the range, credited to the current assignee) against the same window capacity. The window picker enables past ranges. | `r` already exists. Reuse the Dashboard's rule that tickets follow their current assignee. Reference app limits history to 180 days; here it is the 366 days already pulled. Resolved-after-due flag. |

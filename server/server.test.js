@@ -48,6 +48,15 @@ describe('buildQueries', () => {
     expect(() => assertConfig({ ...cfg, projects: ['ABC; DROP'] })).toThrow(/project keys/)
     expect(() => assertConfig({ ...cfg, historyDays: 5 })).toThrow(/historyDays/)
     expect(() => assertConfig({ ...cfg, pairJqlField: 'Pair' })).toThrow(/pairJqlField/)
+    expect(() => assertConfig({ ...cfg, workload: { ...cfg.workload, focus: 3 } })).toThrow(/focus/)
+    expect(() => assertConfig({ ...cfg, workload: { ...cfg.workload, daysPerWeek: 6 } })).toThrow(/daysPerWeek/)
+    expect(() => assertConfig({ ...cfg, workload: { ...cfg.workload, overrides: { 'Doe, Jamie': { focus: 2 } } } })).toThrow(/focus/)
+    // an override for someone no longer on the roster must not block a refresh
+    expect(() => assertConfig({ ...cfg, workload: { ...cfg.workload, overrides: { 'Left, Team': { focus: 0.5 } } } })).not.toThrow()
+  })
+  it('treats the workload block as optional', () => {
+    const { workload, ...bare } = cfg
+    expect(() => assertConfig(bare)).not.toThrow()
   })
 })
 
@@ -162,9 +171,44 @@ describe('Jira client status history', () => {
 
 describe('toPoolRow', () => {
   it('reads assignee and Pair display names, tolerating missing fields', () => {
-    expect(toPoolRow(issue('A-1', 'Open', 'Dev, Dee', ['Roe, Alex']), cfg)).toEqual({ k: 'A-1', t: 'title A-1', s: 'Open', a: 'Dev, Dee', pair: ['Roe, Alex'], c: '2026-10-01T10:00:00.000-0400', u: '2026-10-27T09:00:00.000-0400', r: null })
+    expect(toPoolRow(issue('A-1', 'Open', 'Dev, Dee', ['Roe, Alex']), cfg)).toEqual({ k: 'A-1', t: 'title A-1', s: 'Open', a: 'Dev, Dee', pair: ['Roe, Alex'], c: '2026-10-01T10:00:00.000-0400', u: '2026-10-27T09:00:00.000-0400', r: null, y: null, d: null, z: null, rk: null, sd: null })
     expect(toPoolRow(issue('A-3', 'Open', null, [], '  [DESIGN]  spaced   title '), cfg).t).toBe('[DESIGN] spaced title')
-    expect(toPoolRow({ key: 'A-2', fields: {} }, cfg)).toEqual({ k: 'A-2', t: '', s: 'Unknown', a: null, pair: [], c: null, u: null, r: null })
+    expect(toPoolRow({ key: 'A-2', fields: {} }, cfg)).toEqual({ k: 'A-2', t: '', s: 'Unknown', a: null, pair: [], c: null, u: null, r: null, y: null, d: null, z: null, rk: null, sd: null })
+  })
+
+  it('reads issue type, due date, T-shirt size (a select) and rank, using the configured field IDs', () => {
+    const w = cfg.workload
+    const i = issue('A-1', 'Open', 'Dev, Dee')
+    i.fields.issuetype = { name: 'Story' }
+    i.fields.duedate = '2026-12-02'
+    i.fields[w.sizeFieldId] = { value: 'SM', id: '1' }
+    i.fields[w.rankFieldId] = '0|hzzzzz:'
+    expect(toPoolRow(i, cfg)).toMatchObject({ y: 'Story', d: '2026-12-02', z: 'SM', rk: '0|hzzzzz:' })
+  })
+
+  it('reads the start date from the configured start field, and leaves it null without one', () => {
+    const i = issue('A-1', 'Open', 'Dev, Dee')
+    i.fields[cfg.workload.startFieldId] = '2026-11-03'
+    expect(toPoolRow(i, cfg).sd).toBe('2026-11-03')
+    const noStart = { ...cfg, workload: { ...cfg.workload, startFieldId: undefined } }
+    expect(toPoolRow(i, noStart).sd).toBeNull()
+    i.fields[cfg.workload.startFieldId] = { not: 'a date string' }
+    expect(toPoolRow(i, cfg).sd).toBeNull()
+  })
+
+  it('tolerates a plain-string size, and a size or rank that is not usable', () => {
+    const w = cfg.workload
+    const a = issue('A-1', 'Open', 'Dev, Dee')
+    a.fields[w.sizeFieldId] = 'MED'
+    a.fields[w.rankFieldId] = { not: 'a string' }
+    expect(toPoolRow(a, cfg)).toMatchObject({ z: 'MED', rk: null })
+  })
+
+  it('leaves size and rank null when there is no workload block', () => {
+    const { workload, ...bare } = cfg
+    const i = issue('A-1', 'Open', 'Dev, Dee')
+    i.fields[workload.sizeFieldId] = { value: 'SM' }
+    expect(toPoolRow(i, bare)).toMatchObject({ z: null, rk: null })
   })
 })
 
@@ -177,8 +221,8 @@ describe('refreshReport', () => {
     const c = client([issue('X-1', 'Closed', name), issue('X-2', 'Open', name)])
     const { data, summary } = await refreshReport({ cfg, client: c, now })
     expect(c.searchAll).toHaveBeenCalledTimes(1)
-    expect(c.searchAll.mock.calls[0][1]).toEqual(expect.arrayContaining(['created', 'updated', 'resolutiondate', cfg.pairFieldId]))
-    expect(data.version).toBe(3)
+    expect(c.searchAll.mock.calls[0][1]).toEqual(expect.arrayContaining(['created', 'updated', 'resolutiondate', cfg.pairFieldId, 'issuetype', 'duedate', cfg.workload.sizeFieldId, cfg.workload.rankFieldId, cfg.workload.startFieldId]))
+    expect(data.version).toBe(4)
     expect(data.meta.pulledAt).toBe('2026-11-04T15:00:00.000Z')
     expect(data.tickets.map((t) => [t.k, t.r !== null])).toEqual([['X-1', true], ['X-2', false]])
     expect(summary).toMatchObject({ tickets: 2, open: 1, closed: 1, historyDays: cfg.historyDays })

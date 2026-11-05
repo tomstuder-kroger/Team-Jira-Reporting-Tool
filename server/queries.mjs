@@ -1,4 +1,5 @@
 import { ConfigError } from './errors.mjs'
+import { checkWorkloadConfig } from '../src/lib/workloadConfig.js'
 
 const quote = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 const PROJECT = /^[A-Za-z][A-Za-z0-9_]*$/
@@ -10,6 +11,11 @@ export function assertConfig(cfg) {
   if (!Array.isArray(cfg.issueTypes) || cfg.issueTypes.length === 0) throw new ConfigError('config/report.config.json issueTypes is empty.')
   if (!Number.isInteger(cfg.historyDays) || cfg.historyDays < 30 || cfg.historyDays > 366) throw new ConfigError('historyDays must be a whole number from 30 to 366.')
   if (!/^customfield_\d+$/.test(cfg.pairFieldId ?? '') || !/^cf\[\d+\]$/.test(cfg.pairJqlField ?? '')) throw new ConfigError('pairFieldId and pairJqlField must look like customfield_12345 and cf[12345].')
+  // The workload block is optional. When it is there it must be valid; the same check runs in the page.
+  if (cfg.workload !== undefined) {
+    const w = checkWorkloadConfig(cfg.workload)
+    if (!w.ok) throw new ConfigError(`config/report.config.json: ${w.reason}`)
+  }
 }
 
 /**

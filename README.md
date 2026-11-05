@@ -198,7 +198,7 @@ If a key is ever committed, treat it as exposed: revoke it at https://id.atlassi
 npm test
 ```
 
-222 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster and capacity endpoints, the capacity math, and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
+308 tests, none needing the network: the counting rules, the weekly counts, velocity and blocked spells, the date ranges, all 13 FY2026 fiscal periods against Kroger's printed calendar, the merge step, the roster and capacity endpoints, the capacity math, the Workload maths (queue, windows, sizes), and the Jira client and refresh endpoint against a fake Jira (paging, bad key, no network, timeouts, an empty answer, rapid clicks).
 
 ## Packages
 

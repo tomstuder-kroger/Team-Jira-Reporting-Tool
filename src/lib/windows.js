@@ -10,8 +10,8 @@ const DAY_MS = 864e5
 const pad = (n) => String(n).padStart(2, '0')
 const fmtShort = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const fmtFull = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
+export const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+export const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
 const weekStartOf = (d) => addDays(startOfDay(d), -d.getDay())
 const isMidnight = (d) => d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0
 /** The last calendar day a window covers (end is exclusive). */

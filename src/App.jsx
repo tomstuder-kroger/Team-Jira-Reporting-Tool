@@ -3,7 +3,7 @@ import Header from '@/components/Header'
 import Dashboard from '@/components/Dashboard'
 import ReportsPage from '@/components/ReportsPage'
 import RosterPage from '@/components/RosterPage'
-import CapacityPage from '@/components/CapacityPage'
+import WorkloadPage from '@/components/WorkloadPage'
 import KdsNotice from '@/components/KdsNotice'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { usingExampleConfig } from '@/lib/config'
@@ -19,7 +19,7 @@ function useReportData() {
       const res = await fetch(`/data/report.json?t=${Date.now()}`, { cache: 'no-store' })
       if (!res.ok) throw new Error(`report.json returned ${res.status}`)
       const data = await res.json()
-      if (data?.version !== 3) throw new Error('report.json is in an older format')
+      if (![3, 4].includes(data?.version)) throw new Error('report.json is in an older format')
       if (!data?.meta?.pulledAt || !Array.isArray(data?.tickets)) throw new Error('report.json is missing meta or tickets')
       setState({ status: 'ready', data, error: null })
     } catch (e) {
@@ -101,7 +101,7 @@ export default function App() {
         )}
 
         {route === 'roster' && <RosterPage onRefresh={jira.refresh} refreshing={jira.busy} />}
-        {route === 'capacity' && <CapacityPage />}
+        {route === 'capacity' && <WorkloadPage data={data} />}
         {data && route === 'reports' && <ReportsPage data={data} />}
         {data && route === 'dashboard' && <Dashboard data={data} />}
       </main>

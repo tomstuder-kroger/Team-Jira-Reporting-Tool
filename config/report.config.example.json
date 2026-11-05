@@ -28,6 +28,16 @@
     "Selected": "open"
   },
   "defaultBucket": "open",
+  "workload": {
+    "sizeFieldId": "customfield_12346",
+    "rankFieldId": "customfield_12347",
+    "startFieldId": "customfield_12348",
+    "sizeDays": { "XS": 1.5, "SM": 5, "MED": 10, "LG": 20, "XL": 30 },
+    "daysPerWeek": 5,
+    "focus": 1,
+    "overrides": { "Roe, Alex (NonEmp)": { "focus": 0.4 } },
+    "excludedTypes": ["Epic", "Program Epic"]
+  },
   "roster": [
     {
       "jiraName": "Doe, Jamie"

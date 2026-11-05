@@ -6,10 +6,15 @@
 //       h = status changes [[timestamp, fromStatus, toStatus], ...], any order; optional.
 // now:  ISO timestamp of the pull. Date ranges on the page are measured back from it.
 //
-// Output (version 3) carries timestamps and status changes only. Which tickets count as active, and the card notes,
-// are worked out in the browser for whichever date range is selected.
+// Optional per ticket (version 4, for the Workload view): y = issue type, z = T-shirt size label, d = due date and
+// sd = start date (both YYYY-MM-DD), rk = Jira rank string. Each is null when Jira has nothing.
+//
+// Output (version 4) carries names, titles, dates and status changes. Which tickets count as active, the card
+// notes and the workload figures are worked out in the browser for whichever range or window is selected.
 
-export const DATA_VERSION = 3
+import { DEFAULT_SIZE_DAYS } from '../src/lib/workloadConfig.js'
+
+export const DATA_VERSION = 4
 const DAY_MS = 864e5
 
 /** Normalise any parseable timestamp to UTC ISO. null for empty, undefined for unparseable. */
@@ -55,7 +60,18 @@ export function mergeReport({ pool, config, now }) {
     if (!(t.s in config.statusBuckets)) {
       warnings.push(`${t.k} has status "${t.s}", which is not in statusBuckets; it will show as ${config.defaultBucket}.`)
     }
-    tickets.push({ k: t.k, t: t.t, s: t.s, a: t.a ?? null, pair, c: iso(t.c) ?? null, u, r: iso(t.r) ?? null, h: history(t.h) })
+    const sizeDays = config.workload ? (config.workload.sizeDays ?? DEFAULT_SIZE_DAYS) : null
+    if (sizeDays && typeof t.z === 'string' && t.z && !t.r && !Object.hasOwn(sizeDays, t.z)) {
+      warnings.push(`${t.k} has size "${t.z}", which is not in workload.sizeDays; it will count as unsized.`)
+    }
+    tickets.push({
+      k: t.k, t: t.t, s: t.s, a: t.a ?? null, pair, c: iso(t.c) ?? null, u, r: iso(t.r) ?? null, h: history(t.h),
+      y: typeof t.y === 'string' && t.y ? t.y : null,
+      z: typeof t.z === 'string' && t.z ? t.z : null,
+      d: typeof t.d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(t.d) ? t.d.slice(0, 10) : null,
+      sd: typeof t.sd === 'string' && /^\d{4}-\d{2}-\d{2}/.test(t.sd) ? t.sd.slice(0, 10) : null,
+      rk: typeof t.rk === 'string' && t.rk ? t.rk : null,
+    })
   }
 
   const data = {

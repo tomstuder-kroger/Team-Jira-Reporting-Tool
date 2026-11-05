@@ -80,3 +80,52 @@ describe('mergeReport', () => {
     expect(data.tickets[0].h).toEqual([])
   })
 })
+
+describe('mergeReport, workload fields (version 4)', () => {
+  const wcfg = { ...config, workload: { sizeFieldId: 'customfield_1', rankFieldId: 'customfield_2', sizeDays: { SM: 5, MED: 10 } } }
+  const runW = (pool) => mergeReport({ pool, config: wcfg, now: NOW })
+
+  it('writes version 4', () => {
+    expect(DATA_VERSION).toBe(4)
+    expect(run().data.version).toBe(4)
+  })
+
+  it('keeps issue type, size, due date and rank, and nulls anything missing or malformed', () => {
+    const { data } = run([
+      row({ k: 'X-1', y: 'Story', z: 'SM', d: '2026-12-02', rk: '0|hzzzzz:' }),
+      row({ k: 'X-2' }),
+      row({ k: 'X-3', y: '', z: 5, d: 'soon', rk: 7 }),
+      row({ k: 'X-4', d: '2026-12-02T09:00:00.000-0500' }),
+      row({ k: 'X-5', sd: '2026-11-03' }),
+      row({ k: 'X-6', sd: 'next week' }),
+    ])
+    const by = Object.fromEntries(data.tickets.map((t) => [t.k, t]))
+    expect(by['X-1']).toMatchObject({ y: 'Story', z: 'SM', d: '2026-12-02', rk: '0|hzzzzz:' })
+    expect(by['X-2']).toMatchObject({ y: null, z: null, d: null, rk: null })
+    expect(by['X-3']).toMatchObject({ y: null, z: null, d: null, rk: null })
+    expect(by['X-4'].d).toBe('2026-12-02')
+    expect(by['X-5'].sd).toBe('2026-11-03')
+    expect(by['X-6'].sd).toBeNull()
+    expect(by['X-1'].sd).toBeNull()
+  })
+
+  it('warns once about an open ticket whose size is not in sizeDays, and not about known sizes', () => {
+    const { warnings } = runW([row({ k: 'X-1', z: 'XXL' }), row({ k: 'X-2', z: 'SM' }), row({ k: 'X-3', z: null })])
+    const w = warnings.filter((m) => /size/.test(m))
+    expect(w).toHaveLength(1)
+    expect(w[0]).toMatch(/X-1 has size "XXL"/)
+  })
+
+  it('does not warn about the size of a closed ticket, or when there is no workload block', () => {
+    expect(runW([row({ k: 'X-1', z: 'XXL', s: 'Closed', r: '2026-10-30T08:00:00.000-0400' })]).warnings.filter((m) => /size/.test(m))).toHaveLength(0)
+    expect(run([row({ k: 'X-1', z: 'XXL' })]).warnings.filter((m) => /size/.test(m))).toHaveLength(0)
+  })
+
+  it('uses the default sizes when the block does not list any', () => {
+    const c = { ...config, workload: { sizeFieldId: 'customfield_1', rankFieldId: 'customfield_2' } }
+    const { warnings } = mergeReport({ pool: [row({ k: 'X-1', z: 'LG' }), row({ k: 'X-2', z: 'XXL' })], config: c, now: NOW })
+    expect(warnings.filter((m) => /size/.test(m)).join(' ')).toMatch(/X-2/)
+    expect(warnings.join(' ')).not.toMatch(/X-1 has size/)
+  })
+})
+
