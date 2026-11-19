@@ -173,7 +173,6 @@ The repository is public. `.gitignore` excludes `.env`, `config/report.config.js
 - Should the Jira token be replaced with a scoped, read-only token (`read:jira-work`, `read:jira-user`)? Who issues it, and can it be a service account instead of a personal one? **The owner cannot currently get API permissions (2026-11-19), so the MCP route is the only route in use. A sanctioned service account or scoped token would be the cleaner answer for the longer term.**
 - Are ticket titles and per-person capacity data acceptable to hold on a laptop? Is disk encryption required, and are backups included in it?
 - What retention should apply to `report.json` and the backups?
-- Is it acceptable for ticket content, including comment and description text and people's emails, to pass through Claude (Anthropic) during a refresh? Does the organisation's Claude agreement cover it?
-- If the Jira API key was withdrawn on purpose, does refreshing through the owner's MCP sign-in fit the intent of that decision?
+- Is it acceptable for ticket content, including comment and description text and people's emails, to pass through Claude (Anthropic) during a refresh? Does the organisation's Claude agreement cover it? (The owner states they are permitted to use the Atlassian MCP, and chose it because an API key needs too much process for a proof of concept. Whether passing ticket text through Claude was reviewed separately is not recorded.)
 - Should the Google Fonts request be removed by self-hosting the fonts?
 - If sharing is ever wanted, what is the intended path? Today it needs a real design (authentication, hosted secrets, access control by role), not just deploying the dev server.

@@ -104,7 +104,7 @@ Refresh weekly, or whenever you want current numbers.
 
 ### Cost of a refresh through the Atlassian MCP
 
-The REST route above costs nothing per refresh but needs a Jira API key. The MCP route (spec: `docs/superpowers/specs/2026-11-18-mcp-refresh-design.md`) runs headless Claude Code (`claude -p`) on the owner's own sign-in, so each refresh uses Claude. Figures are Claude's own reported cost (`total_cost_usd`, list price). Whether that is billed or counts against a usage allowance depends on how the account is set up and has not been confirmed. Each run is capped at $2 and a whole refresh at $5 (`--max-budget-usd`, `REFRESH_MAX_USD`).
+The REST route above costs nothing per refresh but needs a Jira API key. The MCP route (spec: `docs/superpowers/specs/2026-11-18-mcp-refresh-design.md`) runs headless Claude Code (`claude -p`) on the owner's own sign-in, so each refresh uses Claude. Figures are Claude's own reported cost (`total_cost_usd`, list price). On an account with a monthly allowance (the owner's), a refresh uses up allowance rather than costing money directly, and the figures are a guide to how much; Claude Code's `/usage` shows what is left. Each run is capped at $2 and a whole refresh at $5 (`--max-budget-usd`, `REFRESH_MAX_USD`).
 
 | Measured | What | Time | Cost |
 |---|---|---|---|
