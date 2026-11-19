@@ -170,7 +170,7 @@ The repository is public. `.gitignore` excludes `.env`, `config/report.config.js
 ## Questions for the discussion
 
 - Is a localhost-only tool that holds an API token and ticket titles acceptable under current policy, or does it need review as an internal tool?
-- Should the Jira token be replaced with a scoped, read-only token (`read:jira-work`, `read:jira-user`)? Who issues it, and can it be a service account instead of a personal one?
+- Should the Jira token be replaced with a scoped, read-only token (`read:jira-work`, `read:jira-user`)? Who issues it, and can it be a service account instead of a personal one? **The owner cannot currently get API permissions (2026-11-19), so the MCP route is the only route in use. A sanctioned service account or scoped token would be the cleaner answer for the longer term.**
 - Are ticket titles and per-person capacity data acceptable to hold on a laptop? Is disk encryption required, and are backups included in it?
 - What retention should apply to `report.json` and the backups?
 - Is it acceptable for ticket content, including comment and description text and people's emails, to pass through Claude (Anthropic) during a refresh? Does the organisation's Claude agreement cover it?

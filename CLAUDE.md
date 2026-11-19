@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repository.
 
 A dashboard of Jira activity for the product design team. Four pages (hash routes): **Dashboard** (per-designer cards for a chosen date range, summary tiles, open blockers, a table of designers with no activity), **Reports** (opened/closed by week, blocked over time, open by status, closed by designer, velocity) **Capacity** (the Workload view: open Jira work sized by T-shirt against the days each person has in a chosen window; the earlier typed-in quarterly plan was retired from the page) and **Roster** (add/remove tracked designers by searching Jira). The look follows `capacity-planning-app`: Kroger header and logo, DM Sans and Nunito, shadcn tokens, and a KDS message (`kds-message` from MX Web) for the refresh notice.
 
-Owner: the product design lead. Audience: design leadership. **Localhost only, by decision.** Jira access is either an API key in `.env` or, since the key was revoked on 2026-11-18, the owner's own Atlassian sign-in through Claude Code (the MCP route). The app is not to be hosted or shared, and the MCP route depends on one person's Claude sign-in anyway. The owner is using the app as an MVP to win buy-in for capacity and allocation planning.
+Owner: the product design lead. Audience: design leadership. **Localhost only, by decision.** Jira access is either an API key in `.env` or, since the key was revoked on 2026-11-18, the owner's own Atlassian sign-in through Claude Code (the MCP route, which is permanent: the owner cannot get API permissions). The app is not to be hosted or shared, and the MCP route depends on one person's Claude sign-in anyway. The owner is using the app as an MVP to win buy-in for capacity and allocation planning.
 
 ## Commands
 
@@ -174,7 +174,7 @@ The quarterly plan below no longer has a page. `config/capacity.json`, `server/c
 
 - Does the organisation allow refreshing through the owner's Claude Code and the Atlassian MCP, now that the API key was withdrawn? Ticket content, including comment text the app discards, passes through Claude. Unanswered.
 - How is Claude usage billed on the owner's account (per token, or against an allowance)? The cost figures are list price. Unconfirmed.
-- Can the owner get a scoped read-only API token (`read:jira-work`, `read:jira-user`)? That would make refreshes free and fast again; it only changes `.env`.
+- **Decided 2026-11-19: the owner will not be able to get API permissions.** The MCP route is the long-term route, not a stopgap, so its cost, speed and organisational approval matter more than they would for a fallback. The REST route stays in the code for anyone else who has a token (a scoped `read:jira-work`, `read:jira-user` token would make refreshes free and fast again and only changes `.env`).
 - Which story-point field does the team use, if any?
 - Does FY2027 follow the FY2026 pattern (starts 2027-01-31, quarters 16/12/12/12)?
 
