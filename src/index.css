@@ -147,3 +147,13 @@
     @apply font-sans;
   }
 }
+
+/* Moving bar for a refresh step whose length is not known. Stands still for people who ask for less motion. */
+@keyframes dar-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+.dar-indeterminate { animation: dar-indeterminate 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .dar-indeterminate { animation: none; transform: none; width: 100%; opacity: 0.4; }
+}

@@ -16,6 +16,7 @@ describe('mergeReport', () => {
     expect(data.version).toBe(DATA_VERSION)
     expect(data.meta).toMatchObject({ pulledAt: NOW, historyDays: 120, source: 'example.atlassian.net' })
     expect(data.meta.historyStart).toBe('2026-07-07T15:00:00.000Z')
+    expect(data.meta.roster).toEqual(config.roster.map((r) => r.jiraName))
   })
 
   it('rejects a missing or invalid pull time', () => {

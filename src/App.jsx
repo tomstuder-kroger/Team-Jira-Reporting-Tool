@@ -5,10 +5,13 @@ import ReportsPage from '@/components/ReportsPage'
 import RosterPage from '@/components/RosterPage'
 import WorkloadPage from '@/components/WorkloadPage'
 import KdsNotice from '@/components/KdsNotice'
+import RefreshBanner from '@/components/RefreshBanner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { usingExampleConfig } from '@/lib/config'
 import { clockLabel } from '@/lib/report'
+import { formatElapsed } from '@/lib/refreshProgress'
 import { useRoute } from '@/lib/route'
+import { useJiraRefresh } from '@/lib/useJiraRefresh'
 
 function useReportData() {
   const [state, setState] = useState({ status: 'loading', data: null, error: null })
@@ -31,31 +34,10 @@ function useReportData() {
   return { ...state, reload: load }
 }
 
-function useJiraRefresh(reload) {
-  const [state, setState] = useState({ busy: false, result: null, error: null, finishedAt: 0 })
-
-  const refresh = useCallback(async () => {
-    setState((s) => ({ ...s, busy: true, result: null, error: null }))
-    try {
-      const res = await fetch('/api/refresh', { method: 'POST', headers: { Accept: 'application/json' } })
-      let body = null
-      try { body = await res.json() } catch { /* not JSON */ }
-      if (!res.ok || !body?.ok) {
-        throw new Error(body?.error || (res.status === 404 ? 'The refresh service is not running. Start the app with npm start.' : `Refresh failed (${res.status}).`))
-      }
-      await reload()
-      setState({ busy: false, result: body, error: null, finishedAt: Date.now() })
-    } catch (e) {
-      setState((s) => ({ ...s, busy: false, result: null, error: e.message, finishedAt: Date.now() }))
-    }
-  }, [reload])
-
-  return { ...state, refresh }
-}
-
 function refreshMessage(r) {
   const parts = [`Refreshed from Jira at ${clockLabel(new Date(r.pulledAt))}: ${r.tickets} tickets (${r.open} open, ${r.closed} resolved in the last ${r.historyDays} days).`]
   if (r.skipped) parts[0] = `Refreshed from Jira moments ago (${clockLabel(new Date(r.pulledAt))}), so Jira was not asked again.`
+  if (r.route === 'mcp' && !r.skipped && !r.shared) parts.push(`Through the Atlassian MCP (${r.mode ?? 'full'}): ${r.rowsRead ?? '?'} tickets read, status history re-read for ${r.refetched}, about $${Number(r.costUsd ?? 0).toFixed(2)} of Claude usage${typeof r.seconds === 'number' ? `, in ${formatElapsed(r.seconds * 1000)}` : ''}.`)
   if (r.warnings?.length) parts.push(`${r.warnings.length} warning${r.warnings.length === 1 ? '' : 's'}: ${r.warnings.slice(0, 2).join(' ')}`)
   return parts.join(' ')
 }
@@ -77,6 +59,8 @@ export default function App() {
             </AlertDescription>
           </Alert>
         )}
+
+        {jira.busy && <RefreshBanner progress={jira.progress} startedAt={jira.startedAt} />}
 
         {jira.error && (
           <Alert variant="destructive" className="p-3 text-sm">

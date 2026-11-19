@@ -191,7 +191,7 @@ describe('roster endpoints', () => {
   })
 
   it('slows rapid searches, and says so plainly', async () => {
-    let t = 1000
+    let t = 100000
     const h = handler({ minSearchGapMs: 250, clock: () => t })
     expect((await call(h, { url: '/api/users/search?q=snow' })).res.statusCode).toBe(200)
     t += 100
@@ -201,11 +201,107 @@ describe('roster endpoints', () => {
   })
 
   it('answers with a setup message when credentials are missing, and a plain 502 when Jira fails', async () => {
-    const noCreds = await call(handler({ env: {} }), { url: '/api/users/search?q=snow' })
+    const noCreds = await call(handler({ env: { REFRESH_ROUTE: 'rest' } }), { url: '/api/users/search?q=snow' })
     expect(noCreds.res.statusCode).toBe(503)
     expect(noCreds.res.body.error).toMatch(/JIRA_EMAIL and JIRA_API_TOKEN/)
     const down = await call(handler({ fetchImpl: vi.fn().mockResolvedValue(json(500, {})) }), { url: '/api/users/search?q=snow' })
     expect(down.res.statusCode).toBe(502)
     expect(JSON.stringify(down.res.body)).not.toContain(TOKEN)
+  })
+})
+
+describe('user search through the Atlassian MCP', () => {
+  const mcpEnv = { REFRESH_ROUTE: 'mcp' }
+  const make = (over = {}) => createRosterHandler({ root: mkRoot(), env: mcpEnv, fetchImpl: vi.fn(), minSearchGapMs: 0, mcpMinSearchGapMs: 0, ...over })
+  const answer = (people) => vi.fn(async ({ onUsage }) => { onUsage?.({ costUsd: 0.03 }); return JSON.stringify(people) })
+
+  it('returns display names of active people and never calls the REST client', async () => {
+    const fetchImpl = vi.fn()
+    const mcpRun = answer([{ displayName: 'Snow, Sam', active: true }, { displayName: 'Gone, Gail', active: false }])
+    const { res } = await call(make({ fetchImpl, mcpRun }), { url: '/api/users/search?q=snow' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toEqual({ ok: true, people: [{ displayName: 'Snow, Sam' }] })
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(mcpRun.mock.calls[0][0].prompt).toContain('lookupJiraAccountId')
+    expect(mcpRun.mock.calls[0][0].maxBudgetUsd).toBe(0.5)
+  })
+
+  it('returns the same shape as the REST route, which is what the page reads', async () => {
+    const viaMcp = await call(make({ mcpRun: answer([{ displayName: 'Snow, Sam', active: true }]) }), { url: '/api/users/search?q=snow' })
+    const viaRest = await call(createRosterHandler({ root: mkRoot(), env, fetchImpl: vi.fn().mockResolvedValue(json(200, [person('Snow, Sam')])), minSearchGapMs: 0 }), { url: '/api/users/search?q=snow' })
+    expect(viaMcp.res.body).toEqual(viaRest.res.body)
+    expect(viaMcp.res.body.people.map((p) => p.displayName)).toEqual(['Snow, Sam']) // what searchPeople in src/lib/rosterApi.js does
+  })
+
+  it('uses the MCP when no credentials are set, and REST when they are', async () => {
+    const mcpRun = answer([{ displayName: 'Snow, Sam', active: true }])
+    await call(make({ env: {}, mcpRun }), { url: '/api/users/search?q=snow' })
+    expect(mcpRun).toHaveBeenCalledTimes(1)
+    const rest = vi.fn().mockResolvedValue(json(200, [person('Snow, Sam')]))
+    const viaRest = vi.fn()
+    await call(make({ env, fetchImpl: rest, mcpRun: viaRest }), { url: '/api/users/search?q=snow' })
+    expect(viaRest).not.toHaveBeenCalled()
+    expect(rest).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaks no email or account ID even if Claude returns them', async () => {
+    const mcpRun = answer([{ displayName: 'Snow, Sam', active: true, emailAddress: 'sam@example.com', accountId: '5b10-secret-id' }])
+    const { res } = await call(make({ mcpRun }), { url: '/api/users/search?q=snow' })
+    expect(JSON.stringify(res.body)).not.toMatch(/example\.com|secret-id/)
+  })
+
+  it('discards an answer that carries an email address', async () => {
+    const mcpRun = answer([{ displayName: 'sam@example.com', active: true }])
+    const { res } = await call(make({ mcpRun }), { url: '/api/users/search?q=snow' })
+    expect(res.statusCode).toBe(502)
+    expect(JSON.stringify(res.body)).not.toContain('sam@example.com')
+  })
+
+  it('spaces searches out more on the MCP route, and keeps the short and long text rules', async () => {
+    let t = 100000
+    const h = make({ mcpRun: answer([]), mcpMinSearchGapMs: 1500, clock: () => t })
+    expect((await call(h, { url: '/api/users/search?q=snow' })).res.statusCode).toBe(200)
+    t += 400
+    expect((await call(h, { url: '/api/users/search?q=snow' })).res.statusCode).toBe(429)
+    t += 1500
+    expect((await call(h, { url: '/api/users/search?q=snow' })).res.statusCode).toBe(200)
+    expect((await call(make({ mcpRun: answer([]) }), { url: '/api/users/search?q=a' })).res.body.people).toEqual([])
+    expect((await call(make({ mcpRun: answer([]) }), { url: `/api/users/search?q=${'x'.repeat(61)}` })).res.statusCode).toBe(400)
+  })
+})
+
+describe('removing someone prunes their saved tickets', () => {
+  const [keep, drop] = [cfg.roster[0].jiraName, cfg.roster[1].jiraName]
+  const t = (k, a, pair = []) => ({ k, t: k, s: 'Open', a, pair, c: '2026-10-01T00:00:00.000Z', u: '2026-10-02T00:00:00.000Z', r: null, h: [] })
+  const withReport = (tickets) => {
+    const root = mkRoot()
+    const file = path.join(root, 'public/data/report.json')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, JSON.stringify({ version: 4, meta: { pulledAt: '2026-11-18T00:00:00.000Z', roster: cfg.roster.map((r) => r.jiraName) }, tickets }))
+    return { root, file }
+  }
+  const saved = (file) => JSON.parse(fs.readFileSync(file, 'utf8'))
+
+  it('drops tickets nobody remaining is assigned to or paired on, keeps the rest, and backs up the old file', () => {
+    const { root, file } = withReport([t('ABC-1', keep), t('ABC-2', drop), t('ABC-3', drop, [keep]), t('ABC-4', 'Someone, Else', [drop])])
+    const out = saveRoster(root, cfg.roster.filter((r) => r.jiraName !== drop))
+    expect(out.pruned).toBe(2) // ABC-2 and ABC-4; ABC-3 stays because the remaining person is on it as Pair
+    expect(saved(file).tickets.map((x) => x.k)).toEqual(['ABC-1', 'ABC-3'])
+    expect(saved(file).meta.roster).toContain(drop) // the snapshot is of the last pull; the next refresh reads the change
+    const backup = path.join(root, 'data-raw/report.before-roster-change.json')
+    expect(saved(backup).tickets).toHaveLength(4)
+  })
+
+  it('does not prune when only adding, and leaves a report alone if nothing would stay', () => {
+    const { root, file } = withReport([t('ABC-1', keep), t('ABC-2', drop)])
+    expect(saveRoster(root, [...cfg.roster, { jiraName: 'New, Nia' }]).pruned).toBeUndefined()
+    expect(saved(file).tickets).toHaveLength(2)
+    expect(saveRoster(root, [{ jiraName: 'Nobody, Here' }]).pruned).toBeUndefined() // nothing would stay: leave it
+    expect(saved(file).tickets).toHaveLength(2)
+  })
+
+  it('works when there is no saved report yet', () => {
+    const root = mkRoot()
+    expect(saveRoster(root, cfg.roster.slice(0, 1)).pruned).toBeUndefined()
   })
 })

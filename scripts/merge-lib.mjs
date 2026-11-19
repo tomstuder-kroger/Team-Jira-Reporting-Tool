@@ -81,6 +81,7 @@ export function mergeReport({ pool, config, now }) {
       historyDays: config.historyDays,
       historyStart: new Date(new Date(pulledAt).getTime() - config.historyDays * DAY_MS).toISOString(),
       source: config.siteUrl.replace(/^https?:\/\//, ''),
+      roster: config.roster.map((r) => r.jiraName), // who was tracked at this pull, so a later refresh can tell who was added or removed
     },
     tickets,
   }

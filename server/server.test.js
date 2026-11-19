@@ -302,8 +302,8 @@ describe('POST /api/refresh handler', () => {
     expect(readReport(path.join(root, 'public/data/report.json')).tickets).toHaveLength(1)
   })
 
-  it('returns a setup message, not a crash, when credentials are missing', async () => {
-    const h = createRefreshHandler({ root: mkRoot(), env: {}, fetchImpl: vi.fn() })
+  it('returns a setup message, not a crash, when the REST route is chosen and credentials are missing', async () => {
+    const h = createRefreshHandler({ root: mkRoot(), env: { REFRESH_ROUTE: 'rest' }, fetchImpl: vi.fn() })
     const { res } = await call(h)
     expect(res.statusCode).toBe(503)
     expect(res.body.error).toMatch(/JIRA_EMAIL and JIRA_API_TOKEN/)

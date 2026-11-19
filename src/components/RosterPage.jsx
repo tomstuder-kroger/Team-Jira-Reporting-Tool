@@ -13,12 +13,13 @@ const FIELD =
   'h-8 w-full rounded-md border border-input bg-input/20 px-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30'
 
 const list = (names) => names.map(shortName).join(', ')
-const savedMessage = ({ added, removed }) => {
+const savedMessage = ({ added, removed, pruned }) => {
   const parts = []
   if (added.length) parts.push(`Added ${list(added)}.`)
   if (removed.length) parts.push(`Removed ${list(removed)}.`)
+  if (pruned) parts.push(`${pruned} saved ticket${pruned === 1 ? '' : 's'} that nobody tracked any more ${pruned === 1 ? 'was' : 'were'} dropped from the data.`)
   if (!parts.length) parts.push('The roster was already up to date.')
-  if (added.length) parts.push('Their tickets appear after the next refresh from Jira.')
+  if (added.length) parts.push('Their tickets appear after the next refresh from Jira, which reads only their tickets.')
   return `Roster saved. ${parts.join(' ')}`
 }
 
@@ -69,6 +70,7 @@ export default function RosterPage({ onRefresh, refreshing }) {
   }, [saved])
 
   const discard = () => { setRemoved(new Set()); setAdded([]); setSaveError(null) }
+  const typed = query.trim().replace(/\s+/g, ' ')
 
   const save = async () => {
     setSaving(true)
@@ -200,12 +202,18 @@ export default function RosterPage({ onRefresh, refreshing }) {
               })}
             </ul>
           )}
+          {typed.length >= 2 && !tracked.has(typed) && results.status !== 'loading' && (
+            <div className="flex flex-col gap-1.5 rounded-md border border-dashed p-3 text-sm">
+              <span className="text-muted-foreground">Not in the list? Add the name exactly as Jira shows it, including any “(NonEmp)” ending. A name that does not match Jira gets an empty card.</span>
+              <Button variant="outline" size="sm" className="self-start" onClick={() => add(typed)}>Add “{typed}” as typed</Button>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">Two people can share a name. Check the full name shown here against Jira before saving. Only names are kept, never emails or IDs.</p>
         </Card>
       </div>
 
       <footer className="pt-1 text-center text-xs text-muted-foreground">
-        Saving rewrites only the roster in <code className="font-mono">config/report.config.json</code> on this computer and keeps the previous version in <code className="font-mono">report.config.backup.json</code>. Nothing is changed in Jira. Removing someone hides them straight away; adding someone needs a refresh from Jira to pull their tickets.
+        Saving rewrites only the roster in <code className="font-mono">config/report.config.json</code> on this computer and keeps the previous version in <code className="font-mono">report.config.backup.json</code>. Nothing is changed in Jira. Removing someone hides them straight away and drops their saved tickets, with no call to Jira; adding someone needs a refresh from Jira, which reads only the new person's tickets.
       </footer>
     </>
   )

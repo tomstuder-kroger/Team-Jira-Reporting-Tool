@@ -3,6 +3,9 @@ import path from 'node:path'
 import { ConfigError, JiraError, SetupError } from './errors.mjs'
 import { configPath, readConfig } from './config.mjs'
 import { createJiraClient } from './jira.mjs'
+import { chooseRoute } from './run.mjs'
+import { runClaude, extractJsonArray, userSearchPrompt, cleanPeople } from './mcpRunner.mjs'
+import { readReport, writeReport } from './store.mjs'
 import { checkLocal, makeSend, readJson } from './guard.mjs'
 
 const MAX_ROSTER = 40
@@ -27,6 +30,24 @@ export function cleanRoster(input) {
 }
 
 /**
+ * Drops tickets from report.json that nobody on the roster is assigned to or paired on, so removing someone takes their
+ * tickets out of the saved data without calling Jira. The previous file is kept in data-raw/. Returns how many were
+ * dropped. A roster that matches no saved ticket at all leaves the file alone (the next refresh will sort it out).
+ */
+export function pruneReport(root, names) {
+  const file = path.join(root, 'public/data/report.json')
+  const data = readReport(file)
+  if (!Array.isArray(data?.tickets)) return 0
+  const tracked = new Set(names)
+  const keep = data.tickets.filter((t) => tracked.has(t.a) || (t.pair ?? []).some((n) => tracked.has(n)))
+  if (keep.length === data.tickets.length || keep.length === 0) return 0
+  fs.mkdirSync(path.join(root, 'data-raw'), { recursive: true })
+  fs.copyFileSync(file, path.join(root, 'data-raw/report.before-roster-change.json'))
+  writeReport(file, { ...data, tickets: keep })
+  return data.tickets.length - keep.length
+}
+
+/**
  * Replaces only the roster in config/report.config.json. Keeps a backup of the previous file first,
  * then writes through a temp file and a rename so the config is never half written.
  */
@@ -42,10 +63,13 @@ export function saveRoster(root, input) {
   fs.writeFileSync(tmp, JSON.stringify({ ...cfg, roster }, null, 2) + '\n')
   fs.renameSync(tmp, file)
 
+  const removed = [...before].filter((n) => !after.has(n))
+  const pruned = removed.length ? pruneReport(root, roster.map((r) => r.jiraName)) : 0
   return {
     count: roster.length,
     added: roster.filter((r) => !before.has(r.jiraName)).map((r) => r.jiraName),
-    removed: [...before].filter((n) => !after.has(n)),
+    removed,
+    ...(pruned ? { pruned } : {}),
   }
 }
 
@@ -56,7 +80,7 @@ export function saveRoster(root, input) {
  *   GET  /api/users/search    ?q=text, Jira display names that match
  * Localhost only, same-origin, JSON only. The user search is the only call that reaches Jira.
  */
-export function createRosterHandler({ root, env, fetchImpl, minSearchGapMs = 250, clock = () => Date.now() }) {
+export function createRosterHandler({ root, env, fetchImpl, mcpRun, minSearchGapMs = 250, mcpMinSearchGapMs = 1500, clock = () => Date.now() }) {
   let lastSearch = 0
 
   return async function rosterHandler(req, res, next) {
@@ -91,9 +115,22 @@ export function createRosterHandler({ root, env, fetchImpl, minSearchGapMs = 250
       const q = (url.searchParams.get('q') ?? '').trim()
       if (q.length < 2) return send(200, { ok: true, people: [] })
       if (q.length > 60) return send(400, { ok: false, error: 'Search text is too long.' })
+      const viaMcp = chooseRoute(env) === 'mcp'
       const now = clock()
-      if (now - lastSearch < minSearchGapMs) return send(429, { ok: false, error: 'Searching too fast. Wait a moment.' })
+      if (now - lastSearch < (viaMcp ? mcpMinSearchGapMs : minSearchGapMs)) return send(429, { ok: false, error: 'Searching too fast. Wait a moment.' })
       lastSearch = now
+
+      if (viaMcp) {
+        // Without a Jira key the search goes through the Atlassian MCP: names only, active people only.
+        const cloudId = env.JIRA_CLOUD_ID || readConfig(root).cloudId
+        if (!cloudId) throw new SetupError('The Jira cloud ID is not set. Add cloudId to config/report.config.json.')
+        const text = await (mcpRun ?? runClaude)({
+          prompt: userSearchPrompt({ cloudId, query: q }), maxBudgetUsd: 0.5,
+          onUsage: (u) => console.log(`[roster] user search through the MCP, about $${(u.costUsd ?? 0).toFixed(2)}`),
+        })
+        // Same shape as the REST route ({ displayName }), which is what the page reads.
+        return send(200, { ok: true, people: cleanPeople(extractJsonArray(text)).map((displayName) => ({ displayName })) })
+      }
 
       if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) throw new SetupError('Jira credentials are not set. Add JIRA_EMAIL and JIRA_API_TOKEN to .env, then restart npm start.')
       const cfg = readConfig(root)
