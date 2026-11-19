@@ -118,51 +118,7 @@ export default function RosterPage({ onRefresh, refreshing }) {
       )}
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-3.5">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tracked Team Members ({working.length})</CardTitle>
-            <CardDescription>{dirty ? 'unsaved changes' : 'saved'}</CardDescription>
-          </CardHeader>
-
-          {saved === null && !loadError && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-          {saved && (
-            <ul className="flex flex-col divide-y" aria-label="Tracked Team Members">
-              {saved.map((name) => {
-                const gone = removed.has(name)
-                return (
-                  <li key={name} className="flex items-center justify-between gap-3 py-2">
-                    <span className={cn('min-w-0', gone && 'text-muted-foreground line-through')}>
-                      <span className="block truncate font-medium">{shortName(name)}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{name}</span>
-                    </span>
-                    {gone ? (
-                      <Button variant="outline" size="sm" onClick={() => setRemoved((r) => { const n = new Set(r); n.delete(name); return n })}>Undo</Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" aria-label={`Remove ${shortName(name)}`} onClick={() => setRemoved((r) => new Set(r).add(name))}>Remove</Button>
-                    )}
-                  </li>
-                )
-              })}
-              {added.map((name) => (
-                <li key={name} className="flex items-center justify-between gap-3 py-2">
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{shortName(name)} <span className="ml-1 text-xs font-normal text-success">new</span></span>
-                    <span className="block truncate text-xs text-muted-foreground">{name}</span>
-                  </span>
-                  <Button variant="ghost" size="sm" aria-label={`Cancel adding ${shortName(name)}`} onClick={() => setAdded((a) => a.filter((n) => n !== name))}>Cancel</Button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button size="lg" onClick={save} disabled={!canSave}>{saving ? 'Saving…' : 'Save roster'}</Button>
-            <Button variant="outline" size="lg" onClick={discard} disabled={!dirty || saving}>Discard changes</Button>
-            {dirty && working.length === 0 && <span className="text-xs text-destructive">The roster cannot be empty.</span>}
-          </div>
-        </Card>
-
+        {/* The search comes first so adding someone never means scrolling past the whole team. */}
         <Card>
           <CardHeader>
             <CardTitle>Add a team member</CardTitle>
@@ -209,6 +165,51 @@ export default function RosterPage({ onRefresh, refreshing }) {
             </div>
           )}
           <p className="text-xs text-muted-foreground">Two people can share a name. Check the full name shown here against Jira before saving. Only names are kept, never emails or IDs.</p>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tracked Team Members ({working.length})</CardTitle>
+            <CardDescription>{dirty ? 'unsaved changes' : 'saved'}</CardDescription>
+          </CardHeader>
+
+          {saved === null && !loadError && <p className="text-sm text-muted-foreground">Loading…</p>}
+
+          {saved && (
+            <ul className="flex flex-col divide-y" aria-label="Tracked Team Members">
+              {saved.map((name) => {
+                const gone = removed.has(name)
+                return (
+                  <li key={name} className="flex items-center justify-between gap-3 py-2">
+                    <span className={cn('min-w-0', gone && 'text-muted-foreground line-through')}>
+                      <span className="block truncate font-medium">{shortName(name)}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{name}</span>
+                    </span>
+                    {gone ? (
+                      <Button variant="outline" size="sm" onClick={() => setRemoved((r) => { const n = new Set(r); n.delete(name); return n })}>Undo</Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" aria-label={`Remove ${shortName(name)}`} onClick={() => setRemoved((r) => new Set(r).add(name))}>Remove</Button>
+                    )}
+                  </li>
+                )
+              })}
+              {added.map((name) => (
+                <li key={name} className="flex items-center justify-between gap-3 py-2">
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{shortName(name)} <span className="ml-1 text-xs font-normal text-success">new</span></span>
+                    <span className="block truncate text-xs text-muted-foreground">{name}</span>
+                  </span>
+                  <Button variant="ghost" size="sm" aria-label={`Cancel adding ${shortName(name)}`} onClick={() => setAdded((a) => a.filter((n) => n !== name))}>Cancel</Button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button size="lg" onClick={save} disabled={!canSave}>{saving ? 'Saving…' : 'Save roster'}</Button>
+            <Button variant="outline" size="lg" onClick={discard} disabled={!dirty || saving}>Discard changes</Button>
+            {dirty && working.length === 0 && <span className="text-xs text-destructive">The roster cannot be empty.</span>}
+          </div>
         </Card>
       </div>
 

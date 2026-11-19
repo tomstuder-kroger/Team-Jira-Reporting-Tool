@@ -211,7 +211,7 @@ Not built yet: scheduling load across each ticket's start and due dates, a per-p
 
 ## Change who is tracked
 
-**Use the Roster page** (header link, address ends in `#/roster`). Type part of a name, pick the person Jira finds, then **Save roster**. Remove someone with **Remove** (**Undo** brings them back before you save). Nothing changes until you save, and **Discard changes** throws away your edits.
+**Use the Roster page** (header link, address ends in `#/roster`). The **Add a team member** search is at the top. Type part of a name, pick the person Jira finds, then **Save roster**. Remove someone with **Remove** (**Undo** brings them back before you save). Nothing changes until you save, and **Discard changes** throws away your edits.
 
 - Names come from a read-only Jira user search, so they match Jira exactly, including `(NonEmp)`. Only display names are kept, never emails or IDs. With a Jira key the search uses the REST API; without one it goes through the Atlassian MCP (about $0.04 and 6 seconds a search). If someone is not found, **Add “name” as typed** adds the exact Jira display name you type. A name that does not match Jira gets an empty card.
 - Saving rewrites **only** the `roster` part of `config/report.config.json` on this computer and keeps the previous file as `config/report.config.backup.json`. Nothing is changed in Jira. The page reloads so every view uses the new roster.
